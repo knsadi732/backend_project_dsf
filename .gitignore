@@ -1,4 +1,16 @@
 /.claude
-/plan.md
-/prompt.md
-/summary.md
+.env
+
+# Markdown files
+*.md
+
+# Documents
+*.doc
+*.docx
+*.pdf
+*.ppt
+*.pptx
+*.xls
+*.xlsx
+*.txt
+*.csv
