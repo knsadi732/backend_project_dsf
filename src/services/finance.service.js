@@ -20,15 +20,27 @@ async function assertPostingDateOpen(companyId, date = new Date()) {
 
 // Accountant scope --------------------------------------------------------
 
+/**
+ * Fixed accounting direction for reference types with unambiguous cash-flow semantics.
+ * Money in (sales/collections) is a credit, money out (purchases/expenses) is a debit.
+ * Only 'manual' entries let the caller choose, since they have no fixed semantics.
+ */
+const FIXED_DIRECTION_BY_REFERENCE_TYPE = {
+  order: 'credit',
+  purchase_order: 'debit',
+  expense: 'debit',
+};
+
 async function recordTransaction(companyId, { branchId, transactionDate, referenceType, referenceId, direction, amount, description }, actorId) {
   const date = transactionDate || new Date();
+  const resolvedDirection = FIXED_DIRECTION_BY_REFERENCE_TYPE[referenceType] || direction;
   return withTransaction(
     async (client) => {
       const period = await assertPostingDateOpen(companyId, date);
       return financeTransactionRepository.create(
         client,
         companyId,
-        { branchId, transactionDate: date, fiscalPeriodId: period?.id, referenceType, referenceId, direction, amount, description },
+        { branchId, transactionDate: date, fiscalPeriodId: period?.id, referenceType, referenceId, direction: resolvedDirection, amount, description },
         actorId,
       );
     },

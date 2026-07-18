@@ -9,6 +9,9 @@ function requestMeta(req) {
     ipAddress: req.ip,
     userAgent: req.headers['user-agent'],
     deviceSignature: req.headers['x-device-signature'],
+    latitude: req.body?.latitude,
+    longitude: req.body?.longitude,
+    locationLabel: req.body?.locationLabel,
   };
 }
 

@@ -7,6 +7,7 @@ const AppError = require('../utils/AppError');
 const userRepository = require('../repositories/user.repository');
 const roleRepository = require('../repositories/role.repository');
 const sessionRepository = require('../repositories/session.repository');
+const attendanceService = require('./attendance.service');
 
 /** Refresh tokens are high-entropy JWTs — a fast SHA-256 digest is sufficient
  * (and avoids bcrypt's cost factor) for the at-rest session lookup column. */
@@ -62,6 +63,8 @@ async function login(identifier, password, meta = {}) {
   const role = await roleRepository.findById(user.role_id);
   const accessToken = signAccessToken(user, role?.key);
   const refreshToken = await issueSession(user, meta);
+
+  await attendanceService.markCheckIn(user.company_id, user.id, meta);
 
   return {
     accessToken,

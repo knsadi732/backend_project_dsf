@@ -48,6 +48,18 @@ const PURCHASE_ORDER_STATUS_PIPELINE = [
   PURCHASE_ORDER_STATUS.COMPLETED,
 ];
 
+/**
+ * Purchase Request approval workflow: Pending forks to either terminal state,
+ * it never advances further (unlike the linear pipelines above), so
+ * purchaseRequest.service.js validates transitions directly rather than via
+ * utils/stateMachine.js's next-in-pipeline check.
+ */
+const PURCHASE_REQUEST_STATUS = Object.freeze({
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+});
+
 /** Seeded system roles (plan.md Chapter 2 — Service-01). Extensible via DB, not hardcoded gating. */
 const SYSTEM_ROLES = Object.freeze({
   ADMIN: 'admin',
@@ -62,5 +74,6 @@ module.exports = {
   PAYMENT_STATUS_PIPELINE,
   PURCHASE_ORDER_STATUS,
   PURCHASE_ORDER_STATUS_PIPELINE,
+  PURCHASE_REQUEST_STATUS,
   SYSTEM_ROLES,
 };
