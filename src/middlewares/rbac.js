@@ -10,7 +10,7 @@ const rbacService = require('../services/rbac.service');
  */
 function requirePermission(permissionKey) {
   return asyncHandler(async (req, res, next) => {
-    const granted = await rbacService.hasPermission(req.user.roleId, permissionKey);
+    const granted = await rbacService.hasPermission(req.user.id, permissionKey);
     if (!granted) {
       throw new AppError('AUTH_002');
     }

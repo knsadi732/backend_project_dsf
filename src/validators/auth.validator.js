@@ -1,7 +1,7 @@
 const Joi = require('joi');
 
 const login = Joi.object({
-  email: Joi.string().email().required(),
+  identifier: Joi.string().required(), // email or phone number
   password: Joi.string().min(6).required(),
 });
 

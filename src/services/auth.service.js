@@ -48,8 +48,8 @@ async function issueSession(user, meta = {}) {
   return refreshToken;
 }
 
-async function login(email, password, meta = {}) {
-  const user = await userRepository.findActiveByEmail(email);
+async function login(identifier, password, meta = {}) {
+  const user = await userRepository.findActiveByIdentifier(identifier);
   if (!user || user.status !== 'active') {
     throw new AppError('AUTH_003');
   }

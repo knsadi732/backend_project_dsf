@@ -1,6 +1,7 @@
 const { CACHE_PREFIX, CACHE_TTL_SECONDS } = require('../config/redis');
 const cache = require('../redis/cache');
 const permissionRepository = require('../repositories/permission.repository');
+const userRepository = require('../repositories/user.repository');
 
 /**
  * Resolves and caches a role's permission set (plan.md Chapter 6 — Permission
@@ -17,9 +18,17 @@ async function getPermissionKeysForRole(roleId) {
   return keys;
 }
 
-async function hasPermission(roleId, permissionKey) {
-  const keys = await getPermissionKeysForRole(roleId);
-  return keys.includes(permissionKey);
+/**
+ * A user may act under multiple roles (their primary users.role_id plus any
+ * grants in user_roles) — permission is granted if ANY of those roles has it.
+ */
+async function hasPermission(userId, permissionKey) {
+  const roleIds = await userRepository.findRoleIdsForUser(userId);
+  for (const roleId of roleIds) {
+    const keys = await getPermissionKeysForRole(roleId);
+    if (keys.includes(permissionKey)) return true;
+  }
+  return false;
 }
 
 async function invalidateRoleCache(roleId) {

@@ -19,13 +19,26 @@ async function createUser(companyId, payload, actorId) {
   const existing = await userRepository.findActiveByEmail(payload.email);
   if (existing) throw new AppError('USER_003');
 
+  const { additionalRoleIds = [], ...rest } = payload;
   const passwordHash = await bcrypt.hash(payload.password, env.auth.saltRounds);
-  return userRepository.create(companyId, { ...payload, passwordHash }, actorId);
+  const user = await userRepository.create(companyId, { ...rest, passwordHash }, actorId);
+
+  if (additionalRoleIds.length) {
+    await userRepository.setAdditionalRoles(user.id, additionalRoleIds, actorId);
+  }
+
+  return user;
 }
 
 async function updateUser(companyId, id, payload, actorId) {
-  const user = await userRepository.update(companyId, id, payload, actorId);
+  const { additionalRoleIds, ...rest } = payload;
+  const user = await userRepository.update(companyId, id, rest, actorId);
   if (!user) throw new AppError('USER_002');
+
+  if (additionalRoleIds !== undefined) {
+    await userRepository.setAdditionalRoles(id, additionalRoleIds, actorId);
+  }
+
   return user;
 }
 

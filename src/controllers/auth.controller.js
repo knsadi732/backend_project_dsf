@@ -13,8 +13,8 @@ function requestMeta(req) {
 }
 
 const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
-  const result = await authService.login(email, password, requestMeta(req));
+  const { identifier, password } = req.body;
+  const result = await authService.login(identifier, password, requestMeta(req));
   return sendSuccess(res, { message: 'Login successful.', data: result });
 });
 
@@ -33,9 +33,14 @@ const logout = asyncHandler(async (req, res) => {
 const me = asyncHandler(async (req, res) => {
   const user = await userRepository.findById(req.user.id);
   const role = await roleRepository.findById(req.user.roleId);
+  const additionalRoles = await userRepository.findAdditionalRoles(req.user.id);
   return sendSuccess(res, {
     message: 'Current user profile.',
-    data: { ...user, role: role ? { id: role.id, key: role.key, name: role.name } : null },
+    data: {
+      ...user,
+      role: role ? { id: role.id, key: role.key, name: role.name } : null,
+      additionalRoles,
+    },
   });
 });
 
