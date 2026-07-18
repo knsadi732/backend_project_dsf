@@ -5,7 +5,6 @@ const createUser = Joi.object({
   warehouseId: Joi.string().guid().allow(null),
   roleId: Joi.string().guid().required(),
   additionalRoleIds: Joi.array().items(Joi.string().guid()).default([]),
-  employeeId: Joi.string().max(50).allow(null, ''),
   fullName: Joi.string().max(255).required(),
   email: Joi.string().email().required(),
   phone: Joi.string().max(20).allow(null, ''),

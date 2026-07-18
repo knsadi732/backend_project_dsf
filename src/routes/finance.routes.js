@@ -30,4 +30,11 @@ router.get('/fiscal-periods', requirePermission('finance.period.close'), paginat
 router.post('/fiscal-periods', requirePermission('finance.period.close'), validate(v.createFiscalPeriod), controller.createFiscalPeriod);
 router.patch('/fiscal-periods/:id/close', requirePermission('finance.period.close'), controller.closeFiscalPeriod);
 
+router.get('/gst', requirePermission('finance.gst.view'), controller.getGstProfile);
+
+router.get('/audits', requirePermission('finance.audit.view'), paginate, controller.listStatutoryAudits);
+router.post('/audits', requirePermission('finance.audit.view'), validate(v.recordStatutoryAudit), controller.recordStatutoryAudit);
+
+router.get('/ledger/cross-verify', requirePermission('finance.ledger.cross_verify'), controller.crossVerifyLedger);
+
 module.exports = router;

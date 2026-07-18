@@ -23,4 +23,16 @@ async function findSystemRoleByKey(key) {
   return rows[0] || null;
 }
 
-module.exports = { findById, findSystemRoleByKey };
+/** All roles usable by a company: its own custom roles plus global system roles. */
+async function listForCompany(companyId) {
+  const { rows } = await query(
+    `SELECT id, company_id, key, name, description, status
+     FROM roles
+     WHERE (company_id = $1 OR company_id IS NULL) AND is_deleted = FALSE
+     ORDER BY company_id IS NULL DESC, name ASC`,
+    [companyId],
+  );
+  return rows;
+}
+
+module.exports = { findById, findSystemRoleByKey, listForCompany };

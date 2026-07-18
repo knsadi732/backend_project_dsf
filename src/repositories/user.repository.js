@@ -98,18 +98,27 @@ async function list(companyId, pagination) {
   return { rows: data.rows, totalRecords: parseInt(count.rows[0].count, 10) };
 }
 
+/** Short department code for employee_id generation, e.g. 'Finance & Compliance' -> 'FIN'. */
+function deriveDeptCode(department) {
+  const letters = (department || '').toUpperCase().replace(/[^A-Z]/g, '');
+  return letters.slice(0, 3) || 'GEN';
+}
+
 async function create(
   companyId,
-  { branchId, warehouseId, roleId, employeeId, fullName, email, phone, passwordHash, department, jobTitle },
+  { branchId, warehouseId, roleId, fullName, email, phone, passwordHash, department, jobTitle },
   createdBy,
 ) {
+  const deptCode = deriveDeptCode(department);
   const { rows } = await query(
     `INSERT INTO users (company_id, branch_id, warehouse_id, role_id, employee_id, full_name, email,
                          phone, password_hash, department, job_title, created_by, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
+     VALUES ($1, $2, $3, $4,
+             'DSF-' || $5 || '-' || LPAD(nextval('users_employee_seq')::text, 4, '0'),
+             $6, $7, $8, $9, $10, $11, $12, $12)
      RETURNING id, company_id, branch_id, warehouse_id, role_id, employee_id, full_name, email,
                phone, department, job_title, status, created_at, updated_at`,
-    [companyId, branchId, warehouseId, roleId, employeeId, fullName, email, phone, passwordHash, department, jobTitle, createdBy],
+    [companyId, branchId, warehouseId, roleId, deptCode, fullName, email, phone, passwordHash, department, jobTitle, createdBy],
   );
   return rows[0];
 }

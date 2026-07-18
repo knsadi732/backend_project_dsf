@@ -2,6 +2,7 @@ const Joi = require('joi');
 
 const recordTransaction = Joi.object({
   branchId: Joi.string().guid().allow(null),
+  transactionDate: Joi.date().iso(),
   referenceType: Joi.string().valid('order', 'purchase_order', 'expense', 'manual').required(),
   referenceId: Joi.string().guid().allow(null),
   direction: Joi.string().valid('debit', 'credit').required(),
@@ -32,4 +33,19 @@ const createFiscalPeriod = Joi.object({
   periodEnd: Joi.date().iso().min(Joi.ref('periodStart')).required(),
 });
 
-module.exports = { recordTransaction, issuePaymentSlip, recordExpense, printBill, createFiscalPeriod };
+const recordStatutoryAudit = Joi.object({
+  fiscalPeriodId: Joi.string().guid().allow(null),
+  auditorName: Joi.string().max(255).required(),
+  conductedAt: Joi.date().iso().required(),
+  findings: Joi.string().allow(null, ''),
+  remarks: Joi.string().allow(null, ''),
+});
+
+module.exports = {
+  recordTransaction,
+  issuePaymentSlip,
+  recordExpense,
+  printBill,
+  createFiscalPeriod,
+  recordStatutoryAudit,
+};

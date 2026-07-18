@@ -2,6 +2,7 @@ const { Router } = require('express');
 const authRoutes = require('./auth.routes');
 const companyRoutes = require('./company.routes');
 const userRoutes = require('./user.routes');
+const roleRoutes = require('./role.routes');
 const auditRoutes = require('./audit.routes');
 const documentRoutes = require('./document.routes');
 const productRoutes = require('./product.routes');
@@ -22,6 +23,7 @@ const router = Router();
 // document-download route would incorrectly demand a bearer token).
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
+router.use('/roles', roleRoutes);
 router.use('/audit-logs', auditRoutes);
 router.use('/documents', documentRoutes);
 router.use('/products', productRoutes); // also exposes /products/categories, /products/stock

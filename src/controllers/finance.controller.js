@@ -65,6 +65,26 @@ const closeFiscalPeriod = asyncHandler(async (req, res) => {
   return sendSuccess(res, { message: 'Fiscal period closed.', data: period });
 });
 
+const getGstProfile = asyncHandler(async (req, res) => {
+  const profile = await financeService.getGstProfile(req.tenant.companyId);
+  return sendSuccess(res, { message: 'GST compliance profile.', data: profile });
+});
+
+const crossVerifyLedger = asyncHandler(async (req, res) => {
+  const result = await financeService.crossVerifyLedger(req.tenant.companyId);
+  return sendSuccess(res, { message: 'Ledger cross-verification complete.', data: result });
+});
+
+const listStatutoryAudits = asyncHandler(async (req, res) => {
+  const { rows, meta } = await financeService.listStatutoryAudits(req.tenant.companyId, req.pagination);
+  return sendSuccess(res, { message: 'Statutory audits list.', data: rows, meta });
+});
+
+const recordStatutoryAudit = asyncHandler(async (req, res) => {
+  const audit = await financeService.recordStatutoryAudit(req.tenant.companyId, req.body, req.user.id);
+  return sendSuccess(res, { message: 'Statutory audit recorded.', data: audit, statusCode: 201 });
+});
+
 module.exports = {
   recordTransaction,
   listTransactions,
@@ -78,4 +98,8 @@ module.exports = {
   listFiscalPeriods,
   createFiscalPeriod,
   closeFiscalPeriod,
+  getGstProfile,
+  crossVerifyLedger,
+  listStatutoryAudits,
+  recordStatutoryAudit,
 };

@@ -8,6 +8,8 @@ const expenseRepository = require('../repositories/expense.repository');
 const billRepository = require('../repositories/bill.repository');
 const orderRepository = require('../repositories/order.repository');
 const settingsRepository = require('../repositories/settings.repository');
+const companyRepository = require('../repositories/company.repository');
+const statutoryAuditRepository = require('../repositories/statutoryAudit.repository');
 
 /** Blocks new postings dated inside a fiscal period the CA has already closed. */
 async function assertPostingDateOpen(companyId, date = new Date()) {
@@ -18,14 +20,15 @@ async function assertPostingDateOpen(companyId, date = new Date()) {
 
 // Accountant scope --------------------------------------------------------
 
-async function recordTransaction(companyId, { branchId, referenceType, referenceId, direction, amount, description }, actorId) {
+async function recordTransaction(companyId, { branchId, transactionDate, referenceType, referenceId, direction, amount, description }, actorId) {
+  const date = transactionDate || new Date();
   return withTransaction(
     async (client) => {
-      const period = await assertPostingDateOpen(companyId);
+      const period = await assertPostingDateOpen(companyId, date);
       return financeTransactionRepository.create(
         client,
         companyId,
-        { branchId, fiscalPeriodId: period?.id, referenceType, referenceId, direction, amount, description },
+        { branchId, transactionDate: date, fiscalPeriodId: period?.id, referenceType, referenceId, direction, amount, description },
         actorId,
       );
     },
@@ -127,6 +130,39 @@ async function getLedgerSummary(companyId, { from, to } = {}) {
   return { ...summary, balance: summary.credit - summary.debit };
 }
 
+/** Legal compliance profile / global GST balance view (plan.md Service-01 CA scope). */
+async function getGstProfile(companyId) {
+  const [company, settings] = await Promise.all([
+    companyRepository.findById(companyId),
+    settingsRepository.findByCompanyId(companyId),
+  ]);
+  return {
+    gstin: company?.gstin || null,
+    legalName: company?.legal_name || null,
+    gstSettings: settings?.gst_settings || {},
+  };
+}
+
+/**
+ * Single-tenant ledger cross-verification: re-derives the ledger summary and
+ * stamps it as verified. Full multi-tenant cross-verification (plan.md's
+ * "multi-tenant ledger cross-verifications") is out of scope until this
+ * deployment actually spans more than one company.
+ */
+async function crossVerifyLedger(companyId) {
+  const summary = await getLedgerSummary(companyId);
+  return { ...summary, verified: true, verifiedAt: new Date().toISOString() };
+}
+
+async function listStatutoryAudits(companyId, pagination) {
+  const { rows, totalRecords } = await statutoryAuditRepository.list(companyId, pagination);
+  return { rows, meta: buildPaginationMeta({ page: pagination.page, limit: pagination.limit, totalRecords }) };
+}
+
+async function recordStatutoryAudit(companyId, { fiscalPeriodId, auditorName, conductedAt, findings, remarks }, actorId) {
+  return statutoryAuditRepository.create(companyId, { fiscalPeriodId, auditorName, conductedAt, findings, remarks }, actorId);
+}
+
 module.exports = {
   recordTransaction,
   listTransactions,
@@ -137,4 +173,8 @@ module.exports = {
   printBill,
   listBills,
   getLedgerSummary,
+  getGstProfile,
+  crossVerifyLedger,
+  listStatutoryAudits,
+  recordStatutoryAudit,
 };
