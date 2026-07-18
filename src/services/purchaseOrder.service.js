@@ -6,7 +6,7 @@ const { PURCHASE_ORDER_STATUS, PURCHASE_ORDER_STATUS_PIPELINE } = require('../co
 const purchaseOrderRepository = require('../repositories/purchaseOrder.repository');
 const stockService = require('./stock.service');
 
-async function createPurchaseOrder(companyId, { branchId, warehouseId, vendorId, items }, actorId) {
+async function createPurchaseOrder(companyId, { branchId, poNumber, warehouseId, vendorId, items }, actorId) {
   return withTransaction(async (client) => {
     const priced = items.map((item) => ({
       productId: item.productId,
@@ -16,7 +16,7 @@ async function createPurchaseOrder(companyId, { branchId, warehouseId, vendorId,
     }));
     const totalAmount = priced.reduce((sum, item) => sum + item.lineTotal, 0);
 
-    const po = await purchaseOrderRepository.create(client, companyId, { branchId, warehouseId, vendorId, totalAmount }, actorId);
+    const po = await purchaseOrderRepository.create(client, companyId, { branchId, poNumber, warehouseId, vendorId, totalAmount }, actorId);
     await purchaseOrderRepository.createItems(client, po.id, priced);
     return po;
   });
@@ -27,6 +27,10 @@ async function getPurchaseOrder(companyId, id) {
   if (!po) throw new AppError('PO_002');
   const items = await purchaseOrderRepository.findItems(id);
   return { ...po, items };
+}
+
+async function generatePoNumber() {
+  return purchaseOrderRepository.generatePoNumber();
 }
 
 async function listPurchaseOrders(companyId, pagination, filters) {
@@ -60,4 +64,4 @@ async function transitionPurchaseOrder(companyId, id, nextStatus, actorId) {
   );
 }
 
-module.exports = { createPurchaseOrder, getPurchaseOrder, listPurchaseOrders, transitionPurchaseOrder };
+module.exports = { createPurchaseOrder, getPurchaseOrder, listPurchaseOrders, transitionPurchaseOrder, generatePoNumber };

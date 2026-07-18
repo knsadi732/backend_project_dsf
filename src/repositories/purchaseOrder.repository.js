@@ -1,17 +1,21 @@
-const crypto = require('crypto');
 const { query } = require('../config/db');
 const { buildListQuery } = require('../utils/queryBuilder');
 
-function generatePoNumber() {
-  return `PO-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+/** Reserves and returns the next PO number, e.g. 'DSF-PO-0001'. Each call consumes the sequence. */
+async function generatePoNumber(runner = query) {
+  const { rows } = await runner(
+    `SELECT 'DSF-PO-' || LPAD(nextval('purchase_orders_po_seq')::text, 4, '0') AS po_number`,
+  );
+  return rows[0].po_number;
 }
 
-async function create(client, companyId, { branchId, warehouseId, vendorId, totalAmount }, createdBy) {
+async function create(client, companyId, { branchId, warehouseId, vendorId, totalAmount, poNumber }, createdBy) {
+  const number = poNumber || (await generatePoNumber((text, params) => client.query(text, params)));
   const { rows } = await client.query(
     `INSERT INTO purchase_orders (company_id, branch_id, warehouse_id, vendor_id, po_number, total_amount, created_by, updated_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
      RETURNING *`,
-    [companyId, branchId, warehouseId, vendorId, generatePoNumber(), totalAmount, createdBy],
+    [companyId, branchId, warehouseId, vendorId, number, totalAmount, createdBy],
   );
   return rows[0];
 }
@@ -78,4 +82,4 @@ async function updateStatus(client, id, expectedVersion, status, updatedBy) {
   return rows[0] || null;
 }
 
-module.exports = { create, createItems, findById, findByIdForUpdate, findItems, list, updateStatus };
+module.exports = { create, createItems, findById, findByIdForUpdate, findItems, list, updateStatus, generatePoNumber };

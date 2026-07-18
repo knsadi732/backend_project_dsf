@@ -12,6 +12,7 @@ router.use(authenticate, tenantContext);
 
 router.get('/', requirePermission('purchase_order.manage'), paginate, controller.list);
 router.post('/', requirePermission('purchase_order.manage'), validate(v.createPurchaseOrder), controller.create);
+router.get('/generate-number', requirePermission('purchase_order.manage'), controller.generateNumber);
 router.get('/:id', requirePermission('purchase_order.manage'), controller.getOne);
 router.patch('/:id/status', requirePermission('purchase_order.manage'), validate(v.transitionStatus), controller.transitionStatus);
 

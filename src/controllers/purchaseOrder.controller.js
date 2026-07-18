@@ -17,9 +17,14 @@ const create = asyncHandler(async (req, res) => {
   return sendSuccess(res, { message: 'Purchase order created.', data: po, statusCode: 201 });
 });
 
+const generateNumber = asyncHandler(async (req, res) => {
+  const poNumber = await poService.generatePoNumber();
+  return sendSuccess(res, { message: 'PO number generated.', data: { poNumber } });
+});
+
 const transitionStatus = asyncHandler(async (req, res) => {
   const po = await poService.transitionPurchaseOrder(req.tenant.companyId, req.params.id, req.body.status, req.user.id);
   return sendSuccess(res, { message: 'Purchase order status updated.', data: po });
 });
 
-module.exports = { list, getOne, create, transitionStatus };
+module.exports = { list, getOne, create, transitionStatus, generateNumber };
