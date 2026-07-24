@@ -22,15 +22,38 @@ async function list(companyId, pagination, { categoryId, brandId } = {}) {
     extraParams,
   });
   const [data, count] = await Promise.all([query(dataSql, dataParams), query(countSql, countParams)]);
-  return { rows: data.rows, totalRecords: parseInt(count.rows[0].count, 10) };
+
+  const brandIds = [...new Set(data.rows.map((r) => r.brand_id).filter(Boolean))];
+  let brandMap = {};
+  if (brandIds.length) {
+    const { rows: brands } = await query(
+      `SELECT id, name, brand_code, country, tagline FROM brands
+       WHERE company_id = $1 AND id = ANY($2) AND is_deleted = FALSE`,
+      [companyId, brandIds],
+    );
+    brandMap = Object.fromEntries(brands.map((b) => [b.id, b]));
+  }
+  const rows = data.rows.map((r) => ({ ...r, brand: brandMap[r.brand_id] || null }));
+
+  return { rows, totalRecords: parseInt(count.rows[0].count, 10) };
 }
 
 async function findById(companyId, id) {
-  const { rows } = await query(`SELECT * FROM products WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE`, [
-    id,
-    companyId,
-  ]);
-  return rows[0] || null;
+  const { rows } = await query(
+    `SELECT p.*, b.name AS brand_name, b.brand_code AS brand_code, b.country AS brand_country,
+            b.tagline AS brand_tagline
+     FROM products p
+     LEFT JOIN brands b ON b.id = p.brand_id AND b.company_id = p.company_id AND b.is_deleted = FALSE
+     WHERE p.id = $1 AND p.company_id = $2 AND p.is_deleted = FALSE`,
+    [id, companyId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  const { brand_name, brand_code, brand_country, brand_tagline, ...product } = row;
+  product.brand = product.brand_id
+    ? { id: product.brand_id, name: brand_name, brand_code, country: brand_country, tagline: brand_tagline }
+    : null;
+  return product;
 }
 
 async function create(companyId, fields, createdBy) {

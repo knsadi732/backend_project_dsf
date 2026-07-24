@@ -10,10 +10,10 @@ const v = require('../validators/purchaseRequest.validator');
 const router = Router();
 router.use(authenticate, tenantContext);
 
-router.get('/', requirePermission('purchase_request.manage'), paginate, controller.list);
-router.post('/', requirePermission('purchase_request.manage'), validate(v.createPurchaseRequest), controller.create);
-router.get('/generate-number', requirePermission('purchase_request.manage'), controller.generateNumber);
-router.get('/:id', requirePermission('purchase_request.manage'), controller.getOne);
-router.patch('/:id/status', requirePermission('purchase_request.manage'), validate(v.decideStatus), controller.decideStatus);
+router.get('/', requirePermission('purchase_request.view'), paginate, controller.list);
+router.post('/', requirePermission('purchase_request.create'), validate(v.createPurchaseRequest), controller.create);
+router.get('/generate-number', requirePermission('purchase_request.create'), controller.generateNumber);
+router.get('/:id', requirePermission('purchase_request.view'), controller.getOne);
+router.patch('/:id/status', requirePermission('purchase_request.approve'), validate(v.decideStatus), controller.decideStatus);
 
 module.exports = router;

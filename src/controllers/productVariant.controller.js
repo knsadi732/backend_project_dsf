@@ -5,6 +5,7 @@ const variantService = require('../services/productVariant.service');
 const list = asyncHandler(async (req, res) => {
   const { rows, meta } = await variantService.listVariants(req.tenant.companyId, req.pagination, {
     productId: req.query.product_id,
+    variantGroupId: req.query.variant_group_id,
     status: req.query.status,
   });
   return sendSuccess(res, { message: 'Product variants list.', data: rows, meta });

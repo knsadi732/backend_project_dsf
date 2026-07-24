@@ -16,12 +16,16 @@ async function peekSku(runner = query) {
   return rows[0].sku;
 }
 
-async function list(companyId, pagination, { productId, status } = {}) {
+async function list(companyId, pagination, { productId, variantGroupId, status } = {}) {
   const extraConditions = [];
   const extraParams = [];
   if (productId) {
     extraConditions.push(`product_id = $${extraParams.length + 2}`);
     extraParams.push(productId);
+  }
+  if (variantGroupId) {
+    extraConditions.push(`variant_group_id = $${extraParams.length + 2}`);
+    extraParams.push(variantGroupId);
   }
   if (status) {
     extraConditions.push(`status = $${extraParams.length + 2}`);
@@ -48,18 +52,23 @@ async function findById(companyId, id) {
   return rows[0] || null;
 }
 
-async function create(companyId, { productId, sku, barcode, size, color, weight, mrp, sellingPrice, wholesalePrice, dealerPrice, costPrice }, createdBy) {
+async function create(
+  companyId,
+  { productId, variantGroupId, sku, barcode, size, color, weight, mrp, sellingPrice, wholesalePrice, dealerPrice, costPrice },
+  createdBy,
+) {
   const resolvedSku = sku || (await generateSku());
   const { rows } = await query(
     `INSERT INTO product_variants (
-       company_id, product_id, sku, barcode, size, color, weight, mrp, selling_price,
+       company_id, product_id, variant_group_id, sku, barcode, size, color, weight, mrp, selling_price,
        wholesale_price, dealer_price, cost_price, created_by, updated_by
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
      RETURNING *`,
     [
       companyId,
       productId,
+      variantGroupId || null,
       resolvedSku,
       barcode || null,
       size || null,
@@ -79,16 +88,18 @@ async function create(companyId, { productId, sku, barcode, size, color, weight,
 async function update(companyId, id, fields, updatedBy) {
   const { rows } = await query(
     `UPDATE product_variants
-     SET barcode = COALESCE($3, barcode), size = COALESCE($4, size), color = COALESCE($5, color),
-         weight = COALESCE($6, weight), mrp = COALESCE($7, mrp), selling_price = COALESCE($8, selling_price),
-         wholesale_price = COALESCE($9, wholesale_price), dealer_price = COALESCE($10, dealer_price),
-         cost_price = COALESCE($11, cost_price), status = COALESCE($12, status),
-         updated_by = $13, updated_at = now()
+     SET variant_group_id = COALESCE($3, variant_group_id), barcode = COALESCE($4, barcode),
+         size = COALESCE($5, size), color = COALESCE($6, color),
+         weight = COALESCE($7, weight), mrp = COALESCE($8, mrp), selling_price = COALESCE($9, selling_price),
+         wholesale_price = COALESCE($10, wholesale_price), dealer_price = COALESCE($11, dealer_price),
+         cost_price = COALESCE($12, cost_price), status = COALESCE($13, status),
+         updated_by = $14, updated_at = now()
      WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE
      RETURNING *`,
     [
       id,
       companyId,
+      fields.variantGroupId,
       fields.barcode,
       fields.size,
       fields.color,
