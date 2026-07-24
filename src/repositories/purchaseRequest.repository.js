@@ -18,13 +18,18 @@ async function peekPrNumber(runner = query) {
   return rows[0].pr_number;
 }
 
-async function create(client, companyId, { branchId, warehouseId, departmentId, requestedBy, prNumber, remarks }, createdBy) {
+async function create(
+  client,
+  companyId,
+  { branchId, warehouseId, departmentId, requestedBy, prNumber, priority, requiredDate, remarks },
+  createdBy,
+) {
   const number = prNumber || (await generatePrNumber((text, params) => client.query(text, params)));
   const { rows } = await client.query(
-    `INSERT INTO purchase_requests (company_id, branch_id, warehouse_id, department_id, requested_by, pr_number, remarks, created_by, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+    `INSERT INTO purchase_requests (company_id, branch_id, warehouse_id, department_id, requested_by, pr_number, priority, required_date, remarks, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
      RETURNING *`,
-    [companyId, branchId || null, warehouseId, departmentId || null, requestedBy, number, remarks || null, createdBy],
+    [companyId, branchId || null, warehouseId, departmentId || null, requestedBy, number, priority, requiredDate || null, remarks || null, createdBy],
   );
   return rows[0];
 }
@@ -32,9 +37,9 @@ async function create(client, companyId, { branchId, warehouseId, departmentId, 
 async function createItems(client, purchaseRequestId, items) {
   for (const item of items) {
     await client.query(
-      `INSERT INTO purchase_request_items (purchase_request_id, product_id, quantity, remarks)
+      `INSERT INTO purchase_request_items (purchase_request_id, product_variant_id, quantity, remarks)
        VALUES ($1, $2, $3, $4)`,
-      [purchaseRequestId, item.productId, item.quantity, item.remarks || null],
+      [purchaseRequestId, item.productVariantId, item.quantity, item.remarks || null],
     );
   }
 }

@@ -3,12 +3,17 @@ const Joi = require('joi');
 const createPurchaseOrder = Joi.object({
   branchId: Joi.string().guid().allow(null),
   poNumber: Joi.string().max(50),
+  purchaseRequestId: Joi.string().guid().required(),
   warehouseId: Joi.string().guid().required(),
   vendorId: Joi.string().guid().required(),
+  deliveryAddress: Joi.string().allow(null, ''),
+  taxAmount: Joi.number().min(0).default(0),
+  paymentTerms: Joi.string().max(255).allow(null, ''),
+  expectedDeliveryDate: Joi.date().allow(null),
   items: Joi.array()
     .items(
       Joi.object({
-        productId: Joi.string().guid().required(),
+        productVariantId: Joi.string().guid().required(),
         quantity: Joi.number().positive().required(),
         unitCost: Joi.number().min(0).required(),
       }),
@@ -18,7 +23,9 @@ const createPurchaseOrder = Joi.object({
 });
 
 const transitionStatus = Joi.object({
-  status: Joi.string().valid('approved', 'ordered', 'received', 'completed').required(),
+  status: Joi.string()
+    .valid('pending_approval', 'approved', 'sent', 'acknowledged', 'partially_received', 'completed', 'cancelled')
+    .required(),
 });
 
 module.exports = { createPurchaseOrder, transitionStatus };

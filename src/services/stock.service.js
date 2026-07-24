@@ -7,8 +7,8 @@ const stockRepository = require('../repositories/stock.repository');
  * composed inside order/purchase-order services so stock movement and the
  * originating document commit atomically (plan.md Chapter 4).
  */
-async function reserveStock(client, companyId, warehouseId, productId, quantity) {
-  const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, productId);
+async function reserveStock(client, companyId, warehouseId, productVariantId, quantity) {
+  const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, productVariantId);
   const available = Number(stock.quantity_on_hand) - Number(stock.quantity_reserved);
   if (available < Number(quantity)) throw new AppError('INV_001');
 
@@ -18,8 +18,8 @@ async function reserveStock(client, companyId, warehouseId, productId, quantity)
   });
 }
 
-async function releaseReservation(client, companyId, warehouseId, productId, quantity) {
-  const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, productId);
+async function releaseReservation(client, companyId, warehouseId, productVariantId, quantity) {
+  const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, productVariantId);
   const nextReserved = Math.max(Number(stock.quantity_reserved) - Number(quantity), 0);
 
   return stockRepository.setQuantities(client, stock.id, {
@@ -29,24 +29,24 @@ async function releaseReservation(client, companyId, warehouseId, productId, qua
 }
 
 /** Converts a held reservation into an actual on-hand deduction (dispatch). */
-async function fulfillReservation(client, companyId, warehouseId, productId, quantity) {
-  const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, productId);
+async function fulfillReservation(client, companyId, warehouseId, productVariantId, quantity) {
+  const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, productVariantId);
   const nextOnHand = Number(stock.quantity_on_hand) - Number(quantity);
   const nextReserved = Math.max(Number(stock.quantity_reserved) - Number(quantity), 0);
 
   return stockRepository.setQuantities(client, stock.id, { quantityOnHand: nextOnHand, quantityReserved: nextReserved });
 }
 
-async function receiveStock(client, companyId, warehouseId, productId, quantity) {
-  const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, productId);
+async function receiveStock(client, companyId, warehouseId, productVariantId, quantity) {
+  const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, productVariantId);
   return stockRepository.setQuantities(client, stock.id, {
     quantityOnHand: Number(stock.quantity_on_hand) + Number(quantity),
     quantityReserved: stock.quantity_reserved,
   });
 }
 
-async function getStock(companyId, warehouseId, productId) {
-  return stockRepository.getStock(companyId, warehouseId, productId);
+async function getStock(companyId, warehouseId, productVariantId) {
+  return stockRepository.getStock(companyId, warehouseId, productVariantId);
 }
 
 async function listStock(companyId, pagination, warehouseId) {

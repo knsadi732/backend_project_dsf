@@ -24,8 +24,9 @@ const ERROR_CODES = {
   PO_001: { httpStatus: 400, message: 'Attempted purchase order state transition violates defined state engine flow rules.' },
   PO_002: { httpStatus: 404, message: 'Purchase order not found.' },
 
-  PR_001: { httpStatus: 400, message: 'Purchase request has already been decided (approved/rejected) and cannot be re-decided.' },
+  PR_001: { httpStatus: 400, message: 'Attempted purchase request state transition violates defined state engine flow rules.' },
   PR_002: { httpStatus: 404, message: 'Purchase request not found.' },
+  PR_003: { httpStatus: 422, message: 'Purchase order can only be raised against an approved purchase request.' },
 
   FIN_001: { httpStatus: 400, message: 'Fiscal period is closed; no further postings are permitted.' },
   FIN_002: { httpStatus: 404, message: 'Fiscal period not found.' },

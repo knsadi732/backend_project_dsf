@@ -14,22 +14,25 @@ async function createOrder(companyId, { branchId, warehouseId, customerId, items
 
     for (const item of items) {
       const { rows } = await client.query(
-        `SELECT * FROM products WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE`,
-        [item.productId, companyId],
+        `SELECT pv.*, p.gst_percentage
+         FROM product_variants pv
+         JOIN products p ON p.id = pv.product_id
+         WHERE pv.id = $1 AND pv.company_id = $2 AND pv.is_deleted = FALSE`,
+        [item.productVariantId, companyId],
       );
-      const product = rows[0];
-      if (!product) throw new AppError('INV_002');
+      const variant = rows[0];
+      if (!variant) throw new AppError('INV_002');
 
-      const lineSubtotal = Number(product.unit_price) * Number(item.quantity);
-      const lineTax = (lineSubtotal * Number(product.tax_rate)) / 100;
+      const lineSubtotal = Number(variant.selling_price) * Number(item.quantity);
+      const lineTax = (lineSubtotal * Number(variant.gst_percentage)) / 100;
       subtotal += lineSubtotal;
       taxAmount += lineTax;
 
       priced.push({
-        productId: item.productId,
+        productVariantId: item.productVariantId,
         quantity: item.quantity,
-        unitPrice: product.unit_price,
-        taxRate: product.tax_rate,
+        unitPrice: variant.selling_price,
+        taxRate: variant.gst_percentage,
         lineTotal: lineSubtotal + lineTax,
       });
     }
@@ -73,9 +76,9 @@ async function transitionOrder(companyId, id, nextStatus, actorId) {
         const items = await orderRepository.findItems(id);
         for (const item of items) {
           if (nextStatus === ORDER_STATUS.CONFIRMED) {
-            await stockService.reserveStock(client, companyId, order.warehouse_id, item.product_id, item.quantity);
+            await stockService.reserveStock(client, companyId, order.warehouse_id, item.product_variant_id, item.quantity);
           } else {
-            await stockService.fulfillReservation(client, companyId, order.warehouse_id, item.product_id, item.quantity);
+            await stockService.fulfillReservation(client, companyId, order.warehouse_id, item.product_variant_id, item.quantity);
           }
         }
       }

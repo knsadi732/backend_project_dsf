@@ -1,19 +1,23 @@
 const { query } = require('../config/db');
 const { buildListQuery } = require('../utils/queryBuilder');
 
-async function list(companyId, pagination, { categoryId } = {}) {
+async function list(companyId, pagination, { categoryId, brandId } = {}) {
   const extraConditions = [];
   const extraParams = [];
   if (categoryId) {
     extraConditions.push(`category_id = $${extraParams.length + 2}`);
     extraParams.push(categoryId);
   }
+  if (brandId) {
+    extraConditions.push(`brand_id = $${extraParams.length + 2}`);
+    extraParams.push(brandId);
+  }
 
   const { dataSql, dataParams, countSql, countParams } = buildListQuery({
     table: 'products',
     companyId,
     pagination,
-    searchableColumns: ['name', 'sku'],
+    searchableColumns: ['name'],
     extraConditions,
     extraParams,
   });
@@ -29,29 +33,27 @@ async function findById(companyId, id) {
   return rows[0] || null;
 }
 
-async function findBySku(companyId, sku) {
-  const { rows } = await query(`SELECT * FROM products WHERE sku = $1 AND company_id = $2 AND is_deleted = FALSE`, [
-    sku,
-    companyId,
-  ]);
-  return rows[0] || null;
-}
-
 async function create(companyId, fields, createdBy) {
   const { rows } = await query(
-    `INSERT INTO products (company_id, category_id, sku, name, description, uom, unit_price, cost_price, tax_rate, created_by, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+    `INSERT INTO products (
+       company_id, category_id, brand_id, name, description, uom, hsn_code, gst_percentage,
+       product_type, bom_required, production_required, packaging_required, created_by, updated_by
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)
      RETURNING *`,
     [
       companyId,
       fields.categoryId || null,
-      fields.sku,
+      fields.brandId || null,
       fields.name,
       fields.description || null,
       fields.uom || 'pair',
-      fields.unitPrice ?? 0,
-      fields.costPrice ?? 0,
-      fields.taxRate ?? 0,
+      fields.hsnCode || null,
+      fields.gstPercentage ?? 0,
+      fields.productType || 'finished_goods',
+      fields.bomRequired ?? false,
+      fields.productionRequired ?? false,
+      fields.packagingRequired ?? false,
       createdBy,
     ],
   );
@@ -61,23 +63,28 @@ async function create(companyId, fields, createdBy) {
 async function update(companyId, id, fields, updatedBy) {
   const { rows } = await query(
     `UPDATE products
-     SET category_id = COALESCE($3, category_id), name = COALESCE($4, name),
-         description = COALESCE($5, description), uom = COALESCE($6, uom),
-         unit_price = COALESCE($7, unit_price), cost_price = COALESCE($8, cost_price),
-         tax_rate = COALESCE($9, tax_rate), status = COALESCE($10, status),
-         updated_by = $11, updated_at = now()
+     SET category_id = COALESCE($3, category_id), brand_id = COALESCE($4, brand_id),
+         name = COALESCE($5, name), description = COALESCE($6, description), uom = COALESCE($7, uom),
+         hsn_code = COALESCE($8, hsn_code), gst_percentage = COALESCE($9, gst_percentage),
+         product_type = COALESCE($10, product_type), bom_required = COALESCE($11, bom_required),
+         production_required = COALESCE($12, production_required), packaging_required = COALESCE($13, packaging_required),
+         status = COALESCE($14, status), updated_by = $15, updated_at = now()
      WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE
      RETURNING *`,
     [
       id,
       companyId,
       fields.categoryId,
+      fields.brandId,
       fields.name,
       fields.description,
       fields.uom,
-      fields.unitPrice,
-      fields.costPrice,
-      fields.taxRate,
+      fields.hsnCode,
+      fields.gstPercentage,
+      fields.productType,
+      fields.bomRequired,
+      fields.productionRequired,
+      fields.packagingRequired,
       fields.status,
       updatedBy,
     ],
@@ -95,4 +102,4 @@ async function softDelete(companyId, id, deletedBy) {
   return rows[0] || null;
 }
 
-module.exports = { list, findById, findBySku, create, update, softDelete };
+module.exports = { list, findById, create, update, softDelete };

@@ -15,6 +15,8 @@ const PERMISSIONS = [
   ['audit.log.view', 'audit', 'View operator action / login / session audit trails.'],
   ['document.manage', 'document', 'Upload, list, and delete documents.'],
   ['product.manage', 'product', 'Manage product catalog, categories, and stock.'],
+  ['product_variant.manage', 'product', 'Manage product variants (SKU, barcode, size, color, pricing).'],
+  ['brand.manage', 'product', 'Manage brand master list.'],
   ['department.manage', 'department', 'Manage department master list.'],
   ['designation.manage', 'designation', 'Manage designation master list.'],
   ['attendance.view', 'attendance', 'View employee attendance records.'],

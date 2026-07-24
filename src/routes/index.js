@@ -6,6 +6,8 @@ const roleRoutes = require('./role.routes');
 const auditRoutes = require('./audit.routes');
 const documentRoutes = require('./document.routes');
 const productRoutes = require('./product.routes');
+const productVariantRoutes = require('./productVariant.routes');
+const brandRoutes = require('./brand.routes');
 const departmentRoutes = require('./department.routes');
 const designationRoutes = require('./designation.routes');
 const attendanceRoutes = require('./attendance.routes');
@@ -31,6 +33,8 @@ router.use('/roles', roleRoutes);
 router.use('/audit-logs', auditRoutes);
 router.use('/documents', documentRoutes);
 router.use('/products', productRoutes); // also exposes /products/categories, /products/stock
+router.use('/product-variants', productVariantRoutes);
+router.use('/brands', brandRoutes);
 router.use('/departments', departmentRoutes);
 router.use('/designations', designationRoutes);
 router.use('/attendance', attendanceRoutes);

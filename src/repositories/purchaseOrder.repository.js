@@ -9,13 +9,45 @@ async function generatePoNumber(runner = query) {
   return rows[0].po_number;
 }
 
-async function create(client, companyId, { branchId, warehouseId, vendorId, totalAmount, poNumber }, createdBy) {
+async function create(
+  client,
+  companyId,
+  {
+    branchId,
+    warehouseId,
+    vendorId,
+    purchaseRequestId,
+    totalAmount,
+    taxAmount,
+    deliveryAddress,
+    paymentTerms,
+    expectedDeliveryDate,
+    poNumber,
+  },
+  createdBy,
+) {
   const number = poNumber || (await generatePoNumber((text, params) => client.query(text, params)));
   const { rows } = await client.query(
-    `INSERT INTO purchase_orders (company_id, branch_id, warehouse_id, vendor_id, po_number, total_amount, created_by, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+    `INSERT INTO purchase_orders (
+       company_id, branch_id, warehouse_id, vendor_id, purchase_request_id, po_number,
+       total_amount, tax_amount, delivery_address, payment_terms, expected_delivery_date, created_by, updated_by
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
      RETURNING *`,
-    [companyId, branchId, warehouseId, vendorId, number, totalAmount, createdBy],
+    [
+      companyId,
+      branchId,
+      warehouseId,
+      vendorId,
+      purchaseRequestId,
+      number,
+      totalAmount,
+      taxAmount,
+      deliveryAddress || null,
+      paymentTerms || null,
+      expectedDeliveryDate || null,
+      createdBy,
+    ],
   );
   return rows[0];
 }
@@ -23,9 +55,9 @@ async function create(client, companyId, { branchId, warehouseId, vendorId, tota
 async function createItems(client, purchaseOrderId, items) {
   for (const item of items) {
     await client.query(
-      `INSERT INTO purchase_order_items (purchase_order_id, product_id, quantity, unit_cost, line_total)
+      `INSERT INTO purchase_order_items (purchase_order_id, product_variant_id, quantity, unit_cost, line_total)
        VALUES ($1, $2, $3, $4, $5)`,
-      [purchaseOrderId, item.productId, item.quantity, item.unitCost, item.lineTotal],
+      [purchaseOrderId, item.productVariantId, item.quantity, item.unitCost, item.lineTotal],
     );
   }
 }

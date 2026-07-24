@@ -7,7 +7,7 @@ const createOrder = Joi.object({
   items: Joi.array()
     .items(
       Joi.object({
-        productId: Joi.string().guid().required(),
+        productVariantId: Joi.string().guid().required(),
         quantity: Joi.number().positive().required(),
       }),
     )

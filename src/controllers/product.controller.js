@@ -58,9 +58,9 @@ const listStock = asyncHandler(async (req, res) => {
 });
 
 const receiveStock = asyncHandler(async (req, res) => {
-  const { warehouseId, productId, quantity } = req.body;
+  const { warehouseId, productVariantId, quantity } = req.body;
   const stock = await withTransaction((client) =>
-    stockService.receiveStock(client, req.tenant.companyId, warehouseId, productId, quantity),
+    stockService.receiveStock(client, req.tenant.companyId, warehouseId, productVariantId, quantity),
   );
   return sendSuccess(res, { message: 'Stock received.', data: stock });
 });

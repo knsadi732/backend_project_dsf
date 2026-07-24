@@ -19,9 +19,9 @@ async function create(client, companyId, { branchId, warehouseId, customerId, su
 async function createItems(client, orderId, items) {
   for (const item of items) {
     await client.query(
-      `INSERT INTO order_items (order_id, product_id, quantity, unit_price, tax_rate, line_total)
+      `INSERT INTO order_items (order_id, product_variant_id, quantity, unit_price, tax_rate, line_total)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [orderId, item.productId, item.quantity, item.unitPrice, item.taxRate, item.lineTotal],
+      [orderId, item.productVariantId, item.quantity, item.unitPrice, item.taxRate, item.lineTotal],
     );
   }
 }

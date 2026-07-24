@@ -23,8 +23,6 @@ async function getProduct(companyId, id) {
 }
 
 async function createProduct(companyId, payload, actorId) {
-  const existing = await productRepository.findBySku(companyId, payload.sku);
-  if (existing) throw new AppError('INV_003');
   return productRepository.create(companyId, payload, actorId);
 }
 
