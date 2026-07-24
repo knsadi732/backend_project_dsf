@@ -17,6 +17,7 @@ const orderRoutes = require('./order.routes');
 const purchaseOrderRoutes = require('./purchaseOrder.routes');
 const purchaseRequestRoutes = require('./purchaseRequest.routes');
 const financeRoutes = require('./finance.routes');
+const loanRoutes = require('./loan.routes');
 const notificationRoutes = require('./notification.routes');
 const analyticsRoutes = require('./analytics.routes');
 
@@ -44,6 +45,7 @@ router.use('/orders', orderRoutes);
 router.use('/purchase-orders', purchaseOrderRoutes);
 router.use('/purchase-requests', purchaseRequestRoutes);
 router.use('/finance', financeRoutes);
+router.use('/loans', loanRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/', companyRoutes); // exposes /company, /branches, /warehouses, /settings

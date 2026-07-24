@@ -36,6 +36,8 @@ const PERMISSIONS = [
   ['finance.audit.view', 'finance', 'View statutory audit records.'],
   ['finance.period.close', 'finance', 'Conclude financial periods.'],
   ['finance.ledger.cross_verify', 'finance', 'Cross-verify multi-tenant ledgers.'],
+  ['loan.view', 'finance', 'View company loans/debt records (read-only).'],
+  ['loan.manage', 'finance', 'Create loans and record repayments/write-offs.'],
 ];
 
 const ROLES = [
@@ -56,6 +58,8 @@ const ROLE_PERMISSIONS = {
     'finance.payment_slip.issue',
     'finance.expense.record',
     'finance.bill.print',
+    'loan.view',
+    'loan.manage',
   ],
   [SYSTEM_ROLES.CA]: [
     'finance.ledger.view',
@@ -63,6 +67,7 @@ const ROLE_PERMISSIONS = {
     'finance.audit.view',
     'finance.period.close',
     'finance.ledger.cross_verify',
+    'loan.view',
     'audit.log.view',
   ],
 };

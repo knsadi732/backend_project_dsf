@@ -32,6 +32,9 @@ const ERROR_CODES = {
   FIN_002: { httpStatus: 404, message: 'Fiscal period not found.' },
   FIN_003: { httpStatus: 409, message: 'Fiscal period date range overlaps an existing period.' },
 
+  LOAN_001: { httpStatus: 404, message: 'Loan not found.' },
+  LOAN_002: { httpStatus: 400, message: 'Loan is not active; repayments/write-off are not permitted.' },
+
   DOC_001: { httpStatus: 404, message: 'Document not found.' },
 
   VALIDATION_001: { httpStatus: 400, message: 'Request payload failed validation.' },
