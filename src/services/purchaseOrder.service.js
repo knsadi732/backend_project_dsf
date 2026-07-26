@@ -51,7 +51,7 @@ async function getPurchaseOrder(companyId, id) {
 }
 
 async function generatePoNumber() {
-  return purchaseOrderRepository.generatePoNumber();
+  return purchaseOrderRepository.peekPoNumber();
 }
 
 async function listPurchaseOrders(companyId, pagination, filters) {

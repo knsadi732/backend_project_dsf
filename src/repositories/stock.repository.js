@@ -45,13 +45,14 @@ async function getStock(companyId, warehouseId, productVariantId) {
 }
 
 async function listByWarehouse(companyId, pagination, warehouseId) {
-  const extraConditions = ['warehouse_id = $2'];
+  const extraConditions = warehouseId ? ['warehouse_id = $2'] : [];
+  const extraParams = warehouseId ? [warehouseId] : [];
   const { dataSql, dataParams, countSql, countParams } = buildListQuery({
     table: 'warehouse_stock',
     companyId,
     pagination,
     extraConditions,
-    extraParams: [warehouseId],
+    extraParams,
   });
   const [data, count] = await Promise.all([query(dataSql, dataParams), query(countSql, countParams)]);
   return { rows: data.rows, totalRecords: parseInt(count.rows[0].count, 10) };

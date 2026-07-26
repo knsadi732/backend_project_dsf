@@ -1,10 +1,28 @@
 const { query } = require('../config/db');
-const { buildListQuery } = require('../utils/queryBuilder');
+
+/** Resolves branch/warehouse/vendor/PR ids to display names alongside them —
+ * raw query rather than buildListQuery since the joins make bare column names ambiguous. */
+const SELECT_WITH_NAMES = `
+  SELECT po.*, b.name AS branch_name, w.name AS warehouse_name, v.name AS vendor_name, pr.pr_number
+  FROM purchase_orders po
+  LEFT JOIN branches b ON b.id = po.branch_id
+  LEFT JOIN warehouses w ON w.id = po.warehouse_id
+  LEFT JOIN vendors v ON v.id = po.vendor_id
+  LEFT JOIN purchase_requests pr ON pr.id = po.purchase_request_id`;
 
 /** Reserves and returns the next PO number, e.g. 'DSF-PO-0001'. Each call consumes the sequence. */
 async function generatePoNumber(runner = query) {
   const { rows } = await runner(
     `SELECT 'DSF-PO-' || LPAD(nextval('purchase_orders_po_seq')::text, 4, '0') AS po_number`,
+  );
+  return rows[0].po_number;
+}
+
+/** Previews the next PO number without consuming the sequence — safe to call repeatedly. */
+async function peekPoNumber(runner = query) {
+  const { rows } = await runner(
+    `SELECT 'DSF-PO-' || LPAD((CASE WHEN is_called THEN last_value + 1 ELSE last_value END)::text, 4, '0') AS po_number
+     FROM purchase_orders_po_seq`,
   );
   return rows[0].po_number;
 }
@@ -64,7 +82,7 @@ async function createItems(client, purchaseOrderId, items) {
 
 async function findById(companyId, id) {
   const { rows } = await query(
-    `SELECT * FROM purchase_orders WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE`,
+    `${SELECT_WITH_NAMES} WHERE po.id = $1 AND po.company_id = $2 AND po.is_deleted = FALSE`,
     [id, companyId],
   );
   return rows[0] || null;
@@ -79,27 +97,41 @@ async function findByIdForUpdate(client, companyId, id) {
 }
 
 async function findItems(purchaseOrderId) {
-  const { rows } = await query(`SELECT * FROM purchase_order_items WHERE purchase_order_id = $1`, [purchaseOrderId]);
+  const { rows } = await query(
+    `SELECT poi.*, pv.sku, pv.size, pv.color, p.name AS product_name
+     FROM purchase_order_items poi
+     LEFT JOIN product_variants pv ON pv.id = poi.product_variant_id
+     LEFT JOIN products p ON p.id = pv.product_id
+     WHERE poi.purchase_order_id = $1`,
+    [purchaseOrderId],
+  );
   return rows;
 }
 
 async function list(companyId, pagination, { status } = {}) {
-  const extraConditions = [];
-  const extraParams = [];
+  const conditions = ['po.company_id = $1', 'po.is_deleted = FALSE'];
+  const params = [companyId];
+
   if (status) {
-    extraConditions.push(`status = $${extraParams.length + 2}`);
-    extraParams.push(status);
+    params.push(status);
+    conditions.push(`po.status = $${params.length}`);
+  }
+  if (pagination.search) {
+    params.push(`%${pagination.search}%`);
+    conditions.push(`po.po_number ILIKE $${params.length}`);
   }
 
-  const { dataSql, dataParams, countSql, countParams } = buildListQuery({
-    table: 'purchase_orders',
-    companyId,
-    pagination,
-    searchableColumns: ['po_number'],
-    extraConditions,
-    extraParams,
-  });
-  const [data, count] = await Promise.all([query(dataSql, dataParams), query(countSql, countParams)]);
+  const whereClause = `WHERE ${conditions.join(' AND ')}`;
+  const safeSortBy = /^[a-zA-Z_]+$/.test(pagination.sortBy) ? pagination.sortBy : 'created_at';
+  const safeSortOrder = pagination.sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+  const dataSql = `${SELECT_WITH_NAMES} ${whereClause} ORDER BY po.${safeSortBy} ${safeSortOrder} LIMIT $${
+    params.length + 1
+  } OFFSET $${params.length + 2}`;
+  const dataParams = [...params, pagination.limit, pagination.offset];
+  const countSql = `SELECT COUNT(*) FROM purchase_orders po ${whereClause}`;
+
+  const [data, count] = await Promise.all([query(dataSql, dataParams), query(countSql, params)]);
   return { rows: data.rows, totalRecords: parseInt(count.rows[0].count, 10) };
 }
 
@@ -114,4 +146,4 @@ async function updateStatus(client, id, expectedVersion, status, updatedBy) {
   return rows[0] || null;
 }
 
-module.exports = { create, createItems, findById, findByIdForUpdate, findItems, list, updateStatus, generatePoNumber };
+module.exports = { create, createItems, findById, findByIdForUpdate, findItems, list, updateStatus, generatePoNumber, peekPoNumber };

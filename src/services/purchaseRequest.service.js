@@ -18,7 +18,8 @@ async function createPurchaseRequest(
       actorId,
     );
     await purchaseRequestRepository.createItems(client, pr.id, items);
-    return pr;
+    const createdItems = await purchaseRequestRepository.findItems(pr.id, (text, params) => client.query(text, params));
+    return { ...pr, items: createdItems };
   });
 }
 
