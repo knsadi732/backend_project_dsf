@@ -1,8 +1,8 @@
 const { query } = require('../config/db');
 const { buildListQuery } = require('../utils/queryBuilder');
 
-async function create(companyId, fields, createdBy) {
-  const { rows } = await query(
+async function create(companyId, fields, createdBy, runner = query) {
+  const { rows } = await runner(
     `INSERT INTO documents (company_id, branch_id, warehouse_id, entity_type, entity_id, file_key, file_name,
                              mime_type, size_bytes, is_public, uploaded_by, created_by, updated_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $11)

@@ -36,17 +36,20 @@ async function getDocument(companyId, id) {
   return document;
 }
 
-/** Public documents resolve to a stable path; everything else needs a signed, time-bound token. */
+/** Public documents resolve to a stable, absolute URL; everything else needs a signed,
+ * time-bound token appended — either way the URL is directly clickable/downloadable,
+ * no manual host prefixing required by the caller. */
 async function getDownloadUrl(companyId, id) {
   const document = await getDocument(companyId, id);
+  const base = `${env.appBaseUrl}${env.apiPrefix}/documents/${id}/download`;
   if (document.is_public) {
-    return { url: `${env.apiPrefix}/documents/${id}/download`, expiresIn: null };
+    return { url: base, expiresIn: null };
   }
 
   const token = jwt.sign({ documentId: id }, env.documents.signingSecret, {
     expiresIn: env.documents.presignedUrlExpiresIn,
   });
-  return { url: `${env.apiPrefix}/documents/${id}/download?token=${token}`, expiresIn: env.documents.presignedUrlExpiresIn };
+  return { url: `${base}?token=${token}`, expiresIn: env.documents.presignedUrlExpiresIn };
 }
 
 /** Authorizes the public download route: the token itself proves access to a private document. */

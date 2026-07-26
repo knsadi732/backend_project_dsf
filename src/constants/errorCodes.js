@@ -28,6 +28,12 @@ const ERROR_CODES = {
   PR_002: { httpStatus: 404, message: 'Purchase request not found.' },
   PR_003: { httpStatus: 422, message: 'Purchase order can only be raised against an approved purchase request.' },
 
+  GRN_001: { httpStatus: 404, message: 'GRN not found.' },
+  GRN_002: { httpStatus: 422, message: 'Invoice file must be a PDF, JPEG, or PNG.' },
+
+  VB_001: { httpStatus: 404, message: 'Vendor bill not found.' },
+  VB_002: { httpStatus: 422, message: 'Payment amount exceeds the outstanding due amount.' },
+
   FIN_001: { httpStatus: 400, message: 'Fiscal period is closed; no further postings are permitted.' },
   FIN_002: { httpStatus: 404, message: 'Fiscal period not found.' },
   FIN_003: { httpStatus: 409, message: 'Fiscal period date range overlaps an existing period.' },

@@ -6,6 +6,7 @@ const { PURCHASE_ORDER_STATUS, PURCHASE_ORDER_STATUS_PIPELINE, PURCHASE_REQUEST_
 const purchaseOrderRepository = require('../repositories/purchaseOrder.repository');
 const purchaseRequestRepository = require('../repositories/purchaseRequest.repository');
 const stockService = require('./stock.service');
+const grnService = require('./grn.service');
 
 /**
  * Business rule (plan.md Chapter 11.20): a Purchase Order can only be created
@@ -87,6 +88,11 @@ async function transitionPurchaseOrder(companyId, id, nextStatus, actorId) {
 
       const updated = await purchaseOrderRepository.updateStatus(client, id, po.version, nextStatus, actorId);
       if (!updated) throw new AppError('PO_001', [], 'Purchase order was modified concurrently — retry the transition.');
+
+      if (nextStatus === PURCHASE_ORDER_STATUS.COMPLETED) {
+        await grnService.createGrnFromPurchaseOrder(client, companyId, updated, actorId);
+      }
+
       return updated;
     },
     { isolationLevel: 'REPEATABLE READ' },

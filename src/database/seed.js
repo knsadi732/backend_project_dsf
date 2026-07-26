@@ -27,6 +27,10 @@ const PERMISSIONS = [
   ['purchase_request.view', 'purchase_request', 'View purchase requests.'],
   ['purchase_request.create', 'purchase_request', 'Raise purchase requests.'],
   ['purchase_request.approve', 'purchase_request', 'Decide (approve/reject) purchase requests — manager-level.'],
+  ['grn.view', 'grn', 'View GRNs (Goods Receipt Notes) auto-generated on purchase order completion.'],
+  ['grn.manage', 'grn', 'Upload vendor invoices against a GRN.'],
+  ['vendor_bill.view', 'vendor_bill', 'View vendor bills/payables auto-generated on GRN creation.'],
+  ['vendor_bill.manage', 'vendor_bill', 'Record vendor payments (UTR, amount) against a vendor bill.'],
   ['notification.manage', 'notification', 'Send and view notifications.'],
   ['analytics.view', 'analytics', 'View dashboard analytics widgets.'],
   ['finance.transaction.create', 'finance', 'Log daily transaction entries.'],
@@ -51,6 +55,7 @@ const ROLES = [
 const NOTIFICATION_TEMPLATES = [
   ['order.confirmed', 'email', 'Your order {{orderNumber}} is confirmed', 'Hi {{customerName}}, your order {{orderNumber}} totalling {{totalAmount}} has been confirmed.'],
   ['user.welcome', 'email', 'Welcome to DS Footwear ERP', 'Hi {{fullName}}, your account has been created. Your role is {{roleName}}.'],
+  ['vendor_bill.paid', 'email', 'Payment received for {{invoiceNumber}}', 'Hi {{vendorName}}, we have paid {{invoiceNumber}} in full. Amount: {{amount}}, UTR: {{utrNumber}}, Paid on: {{paidAt}}.'],
 ];
 
 const ROLE_PERMISSIONS = {

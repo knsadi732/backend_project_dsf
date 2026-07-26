@@ -13,6 +13,7 @@ module.exports = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '4000', 10),
   apiPrefix: process.env.API_PREFIX || '/api/v1',
+  appBaseUrl: process.env.APP_BASE_URL || `http://localhost:${parseInt(process.env.PORT || '4000', 10)}`,
 
   db: {
     host: process.env.PGHOST || 'localhost',
@@ -43,5 +44,14 @@ module.exports = {
     signingSecret: process.env.DOC_SIGNING_SECRET || 'dev_doc_signing_secret',
     presignedUrlExpiresIn: process.env.DOC_PRESIGNED_URL_EXPIRES_IN || '5m',
     maxUploadSizeMb: parseInt(process.env.DOC_MAX_UPLOAD_SIZE_MB || '10', 10),
+  },
+
+  smtp: {
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '465', 10),
+    secure: process.env.SMTP_SECURE !== 'false',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || process.env.SMTP_USER || '',
   },
 };
