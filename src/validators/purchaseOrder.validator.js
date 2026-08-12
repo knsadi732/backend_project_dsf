@@ -2,7 +2,7 @@ const Joi = require('joi');
 
 const createPurchaseOrder = Joi.object({
   branchId: Joi.string().guid().allow(null),
-  poNumber: Joi.string().max(50),
+  rfqId: Joi.string().guid().allow(null),
   purchaseRequestId: Joi.string().guid().required(),
   warehouseId: Joi.string().guid().required(),
   vendorId: Joi.string().guid().required(),

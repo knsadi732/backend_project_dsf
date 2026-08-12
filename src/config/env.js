@@ -23,6 +23,7 @@ module.exports = {
     password: process.env.PGPASSWORD || 'postgres',
     max: parseInt(process.env.PG_POOL_MAX || '20', 10),
     ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    pgDumpPath: process.env.PG_DUMP_PATH || 'pg_dump',
   },
 
   redis: {

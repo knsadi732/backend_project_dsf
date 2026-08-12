@@ -7,6 +7,7 @@ const list = asyncHandler(async (req, res) => {
     productId: req.query.product_id,
     variantGroupId: req.query.variant_group_id,
     status: req.query.status,
+    productType: req.query.product_type,
   });
   return sendSuccess(res, { message: 'Product variants list.', data: rows, meta });
 });

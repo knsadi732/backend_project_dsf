@@ -27,6 +27,8 @@ const PERMISSIONS = [
   ['purchase_request.view', 'purchase_request', 'View purchase requests.'],
   ['purchase_request.create', 'purchase_request', 'Raise purchase requests.'],
   ['purchase_request.approve', 'purchase_request', 'Decide (approve/reject) purchase requests — manager-level.'],
+  ['rfq.view', 'rfq', 'View RFQs, vendor quotations, and quotation comparisons.'],
+  ['rfq.manage', 'rfq', 'Raise RFQs, record vendor quotations, and select the winning vendor.'],
   ['grn.view', 'grn', 'View GRNs (Goods Receipt Notes) auto-generated on purchase order completion.'],
   ['grn.manage', 'grn', 'Upload vendor invoices against a GRN.'],
   ['vendor_bill.view', 'vendor_bill', 'View vendor bills/payables auto-generated on GRN creation.'],

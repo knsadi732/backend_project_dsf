@@ -35,22 +35,22 @@ async function create(
     warehouseId,
     vendorId,
     purchaseRequestId,
+    rfqId,
     totalAmount,
     taxAmount,
     deliveryAddress,
     paymentTerms,
     expectedDeliveryDate,
-    poNumber,
   },
   createdBy,
 ) {
-  const number = poNumber || (await generatePoNumber((text, params) => client.query(text, params)));
+  const number = await generatePoNumber((text, params) => client.query(text, params));
   const { rows } = await client.query(
     `INSERT INTO purchase_orders (
-       company_id, branch_id, warehouse_id, vendor_id, purchase_request_id, po_number,
+       company_id, branch_id, warehouse_id, vendor_id, purchase_request_id, rfq_id, po_number,
        total_amount, tax_amount, delivery_address, payment_terms, expected_delivery_date, created_by, updated_by
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)
      RETURNING *`,
     [
       companyId,
@@ -58,6 +58,7 @@ async function create(
       warehouseId,
       vendorId,
       purchaseRequestId,
+      rfqId || null,
       number,
       totalAmount,
       taxAmount,
@@ -98,7 +99,7 @@ async function findByIdForUpdate(client, companyId, id) {
 
 async function findItems(purchaseOrderId) {
   const { rows } = await query(
-    `SELECT poi.*, pv.sku, pv.size, pv.color, p.name AS product_name
+    `SELECT poi.*, pv.sku, pv.size, pv.color, p.name AS product_name, p.hsn_code, p.uom
      FROM purchase_order_items poi
      LEFT JOIN product_variants pv ON pv.id = poi.product_variant_id
      LEFT JOIN products p ON p.id = pv.product_id

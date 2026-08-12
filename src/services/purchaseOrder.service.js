@@ -5,16 +5,23 @@ const { assertTransition } = require('../utils/stateMachine');
 const { PURCHASE_ORDER_STATUS, PURCHASE_ORDER_STATUS_PIPELINE, PURCHASE_REQUEST_STATUS } = require('../constants/enums');
 const purchaseOrderRepository = require('../repositories/purchaseOrder.repository');
 const purchaseRequestRepository = require('../repositories/purchaseRequest.repository');
+const rfqRepository = require('../repositories/rfq.repository');
+const vendorQuotationRepository = require('../repositories/vendorQuotation.repository');
+const rfqService = require('./rfq.service');
 const stockService = require('./stock.service');
 const grnService = require('./grn.service');
 
 /**
  * Business rule (plan.md Chapter 11.20): a Purchase Order can only be created
- * against an approved Purchase Request.
+ * against an approved Purchase Request. If it's raised off an RFQ (the
+ * procurement-decision path), the vendor must be the one that RFQ's quotation
+ * comparison actually selected ("Purchase Orders can only be created for the
+ * selected vendor"), and the RFQ flips to converted_to_po in the same
+ * transaction as the PO — mirrors grnService.createGrnFromPurchaseOrder.
  */
 async function createPurchaseOrder(
   companyId,
-  { branchId, poNumber, purchaseRequestId, warehouseId, vendorId, deliveryAddress, taxAmount, paymentTerms, expectedDeliveryDate, items },
+  { branchId, purchaseRequestId, rfqId, warehouseId, vendorId, deliveryAddress, taxAmount, paymentTerms, expectedDeliveryDate, items },
   actorId,
 ) {
   return withTransaction(async (client) => {
@@ -22,6 +29,14 @@ async function createPurchaseOrder(
     if (!pr) throw new AppError('PR_002');
     if (pr.status !== PURCHASE_REQUEST_STATUS.APPROVED && pr.status !== PURCHASE_REQUEST_STATUS.CONVERTED_TO_RFQ) {
       throw new AppError('PR_003');
+    }
+
+    if (rfqId) {
+      const rfq = await rfqRepository.findById(companyId, rfqId);
+      const quotation = rfq?.selected_vendor_quotation_id
+        ? await vendorQuotationRepository.findById(companyId, rfq.selected_vendor_quotation_id)
+        : null;
+      if (!quotation || quotation.vendor_id !== vendorId) throw new AppError('RFQ_005');
     }
 
     const priced = items.map((item) => ({
@@ -36,10 +51,15 @@ async function createPurchaseOrder(
     const po = await purchaseOrderRepository.create(
       client,
       companyId,
-      { branchId, poNumber, purchaseRequestId, warehouseId, vendorId, totalAmount, taxAmount, deliveryAddress, paymentTerms, expectedDeliveryDate },
+      { branchId, purchaseRequestId, rfqId, warehouseId, vendorId, totalAmount, taxAmount, deliveryAddress, paymentTerms, expectedDeliveryDate },
       actorId,
     );
     await purchaseOrderRepository.createItems(client, po.id, priced);
+
+    if (rfqId) {
+      await rfqService.markConvertedToPo(client, companyId, rfqId, actorId);
+    }
+
     return po;
   });
 }

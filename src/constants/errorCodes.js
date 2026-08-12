@@ -31,6 +31,15 @@ const ERROR_CODES = {
   GRN_001: { httpStatus: 404, message: 'GRN not found.' },
   GRN_002: { httpStatus: 422, message: 'Invoice file must be a PDF, JPEG, or PNG.' },
 
+  RFQ_001: { httpStatus: 400, message: 'Attempted RFQ state transition violates defined state engine flow rules.' },
+  RFQ_002: { httpStatus: 404, message: 'RFQ not found.' },
+  RFQ_003: { httpStatus: 422, message: 'An RFQ can only be raised against an approved purchase request.' },
+  RFQ_004: { httpStatus: 422, message: 'Vendor quotations can only be recorded once the RFQ has been sent, and the vendor must be one it was sent to.' },
+  RFQ_005: { httpStatus: 422, message: 'Purchase orders raised against an RFQ must use its selected vendor.' },
+
+  VQ_001: { httpStatus: 404, message: 'Vendor quotation not found.' },
+  VQ_002: { httpStatus: 409, message: 'This vendor already has a quotation recorded for this RFQ.' },
+
   VB_001: { httpStatus: 404, message: 'Vendor bill not found.' },
   VB_002: { httpStatus: 422, message: 'Payment amount exceeds the outstanding due amount.' },
 

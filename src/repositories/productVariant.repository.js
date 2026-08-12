@@ -16,7 +16,7 @@ async function peekSku(runner = query) {
   return rows[0].sku;
 }
 
-async function list(companyId, pagination, { productId, variantGroupId, status } = {}) {
+async function list(companyId, pagination, { productId, variantGroupId, status, productType } = {}) {
   const extraConditions = [];
   const extraParams = [];
   if (productId) {
@@ -30,6 +30,12 @@ async function list(companyId, pagination, { productId, variantGroupId, status }
   if (status) {
     extraConditions.push(`status = $${extraParams.length + 2}`);
     extraParams.push(status);
+  }
+  if (productType) {
+    extraConditions.push(
+      `product_id IN (SELECT id FROM products WHERE company_id = $1 AND product_type = $${extraParams.length + 2})`,
+    );
+    extraParams.push(productType);
   }
 
   const { dataSql, dataParams, countSql, countParams } = buildListQuery({

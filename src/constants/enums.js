@@ -88,6 +88,27 @@ const PURCHASE_REQUEST_PRIORITY = Object.freeze({
   URGENT: 'urgent',
 });
 
+/**
+ * RFQ lifecycle (plan.md Chapter 11.20 — RFQ -> Vendor Quotation -> Comparison ->
+ * Vendor Selection -> PO): Draft -> Sent -> Quoted -> Vendor Selected -> Converted
+ * to PO. Cancelled forks off any pre-Converted state, same treatment as PO's Cancelled.
+ */
+const RFQ_STATUS = Object.freeze({
+  DRAFT: 'draft',
+  SENT: 'sent',
+  QUOTED: 'quoted',
+  VENDOR_SELECTED: 'vendor_selected',
+  CONVERTED_TO_PO: 'converted_to_po',
+  CANCELLED: 'cancelled',
+});
+const RFQ_STATUS_PIPELINE = [
+  RFQ_STATUS.DRAFT,
+  RFQ_STATUS.SENT,
+  RFQ_STATUS.QUOTED,
+  RFQ_STATUS.VENDOR_SELECTED,
+  RFQ_STATUS.CONVERTED_TO_PO,
+];
+
 /** Seeded system roles (plan.md Chapter 2 — Service-01). Extensible via DB, not hardcoded gating. */
 const SYSTEM_ROLES = Object.freeze({
   ADMIN: 'admin',
@@ -105,5 +126,7 @@ module.exports = {
   PURCHASE_REQUEST_STATUS,
   PURCHASE_REQUEST_STATUS_PIPELINE,
   PURCHASE_REQUEST_PRIORITY,
+  RFQ_STATUS,
+  RFQ_STATUS_PIPELINE,
   SYSTEM_ROLES,
 };

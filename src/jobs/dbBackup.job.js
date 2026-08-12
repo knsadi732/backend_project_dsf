@@ -18,7 +18,7 @@ async function runDbBackup() {
 
   return new Promise((resolve) => {
     execFile(
-      'pg_dump',
+      env.db.pgDumpPath,
       ['-h', env.db.host, '-p', String(env.db.port), '-U', env.db.user, '-d', env.db.database, '-f', destPath],
       { env: { ...process.env, PGPASSWORD: env.db.password } },
       (err) => {

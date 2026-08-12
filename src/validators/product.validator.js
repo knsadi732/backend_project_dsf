@@ -1,6 +1,6 @@
 const Joi = require('joi');
 
-const PRODUCT_TYPES = ['finished_goods', 'raw_material', 'packaging_material', 'semi_finished_goods', 'consumable', 'service'];
+const PRODUCT_TYPES = ['finished_goods', 'raw_material', 'packaging_material', 'semi_finished_goods', 'consumable', 'service', 'asset'];
 const GENDERS = ['men', 'women', 'kids_boys', 'kids_girls', 'unisex'];
 
 const createCategory = Joi.object({
@@ -26,6 +26,7 @@ const createProduct = Joi.object({
   hsnCode: Joi.string().max(20).allow(null, ''),
   gstPercentage: Joi.number().min(0).max(100),
   productType: Joi.string().valid(...PRODUCT_TYPES),
+  isSellable: Joi.boolean(),
   bomRequired: Joi.boolean(),
   productionRequired: Joi.boolean(),
   packagingRequired: Joi.boolean(),
@@ -42,6 +43,7 @@ const updateProduct = Joi.object({
   hsnCode: Joi.string().max(20).allow(null, ''),
   gstPercentage: Joi.number().min(0).max(100),
   productType: Joi.string().valid(...PRODUCT_TYPES),
+  isSellable: Joi.boolean(),
   bomRequired: Joi.boolean(),
   productionRequired: Joi.boolean(),
   packagingRequired: Joi.boolean(),

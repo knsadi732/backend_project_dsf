@@ -56,13 +56,16 @@ async function findById(companyId, id) {
   return product;
 }
 
+const NOT_SELLABLE_BY_DEFAULT = new Set(['raw_material', 'packaging_material', 'consumable', 'asset']);
+
 async function create(companyId, fields, createdBy) {
+  const productType = fields.productType || 'finished_goods';
   const { rows } = await query(
     `INSERT INTO products (
        company_id, category_id, brand_id, product_code, name, description, gender, uom, hsn_code, gst_percentage,
-       product_type, bom_required, production_required, packaging_required, created_by, updated_by
+       product_type, is_sellable, bom_required, production_required, packaging_required, created_by, updated_by
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16)
      RETURNING *`,
     [
       companyId,
@@ -75,7 +78,8 @@ async function create(companyId, fields, createdBy) {
       fields.uom || 'pair',
       fields.hsnCode || null,
       fields.gstPercentage ?? 0,
-      fields.productType || 'finished_goods',
+      productType,
+      fields.isSellable ?? !NOT_SELLABLE_BY_DEFAULT.has(productType),
       fields.bomRequired ?? false,
       fields.productionRequired ?? false,
       fields.packagingRequired ?? false,
@@ -92,9 +96,10 @@ async function update(companyId, id, fields, updatedBy) {
          product_code = COALESCE($5, product_code), name = COALESCE($6, name),
          description = COALESCE($7, description), gender = COALESCE($8, gender), uom = COALESCE($9, uom),
          hsn_code = COALESCE($10, hsn_code), gst_percentage = COALESCE($11, gst_percentage),
-         product_type = COALESCE($12, product_type), bom_required = COALESCE($13, bom_required),
-         production_required = COALESCE($14, production_required), packaging_required = COALESCE($15, packaging_required),
-         status = COALESCE($16, status), updated_by = $17, updated_at = now()
+         product_type = COALESCE($12, product_type), is_sellable = COALESCE($13, is_sellable),
+         bom_required = COALESCE($14, bom_required),
+         production_required = COALESCE($15, production_required), packaging_required = COALESCE($16, packaging_required),
+         status = COALESCE($17, status), updated_by = $18, updated_at = now()
      WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE
      RETURNING *`,
     [
@@ -110,6 +115,7 @@ async function update(companyId, id, fields, updatedBy) {
       fields.hsnCode,
       fields.gstPercentage,
       fields.productType,
+      fields.isSellable,
       fields.bomRequired,
       fields.productionRequired,
       fields.packagingRequired,
