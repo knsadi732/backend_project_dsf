@@ -1,5 +1,4 @@
 const { query } = require('../config/db');
-const { buildListQuery } = require('../utils/queryBuilder');
 
 /**
  * Locks (or creates then locks) the stock row for a warehouse+product pair.
@@ -44,18 +43,92 @@ async function getStock(companyId, warehouseId, productVariantId) {
   return rows[0] || null;
 }
 
-async function listByWarehouse(companyId, pagination, warehouseId) {
-  const extraConditions = warehouseId ? ['warehouse_id = $2'] : [];
-  const extraParams = warehouseId ? [warehouseId] : [];
-  const { dataSql, dataParams, countSql, countParams } = buildListQuery({
-    table: 'warehouse_stock',
-    companyId,
-    pagination,
-    extraConditions,
-    extraParams,
-  });
-  const [data, count] = await Promise.all([query(dataSql, dataParams), query(countSql, countParams)]);
+// Inventory Category (not to be confused with product_categories, the
+// merchandising category like "Sneakers"): every product is either sellable
+// (finished stock actually sold to customers) or not — and non-sellable
+// splits further into office_consumable (product_type = 'consumable') vs
+// raw_material (everything else non-sellable: raw_material, packaging_material,
+// semi_finished_goods, ...). Mirrors is_sellable's own auto-derivation in
+// migration 0071. Kept as one CASE expression so the list/summary queries
+// below can filter/group on it identically.
+const INVENTORY_CATEGORY_CASE = `
+  CASE
+    WHEN p.is_sellable THEN 'salable'
+    WHEN p.product_type = 'consumable' THEN 'office_consumable'
+    ELSE 'raw_material'
+  END
+`;
+
+// Joined so the client gets variant/product/category/warehouse *names*
+// directly instead of having to resolve IDs against three other list
+// endpoints itself.
+async function listByWarehouse(companyId, pagination, warehouseId, inventoryCategory) {
+  const { limit, offset } = pagination;
+  const params = [companyId];
+  let warehouseClause = '';
+  if (warehouseId) {
+    params.push(warehouseId);
+    warehouseClause = `AND ws.warehouse_id = $${params.length}`;
+  }
+  let categoryClause = '';
+  if (inventoryCategory) {
+    params.push(inventoryCategory);
+    categoryClause = `AND (${INVENTORY_CATEGORY_CASE}) = $${params.length}`;
+  }
+
+  const dataSql = `
+    SELECT
+      ws.id, ws.warehouse_id, ws.product_variant_id, ws.quantity_on_hand, ws.quantity_reserved,
+      ws.status, ws.remarks, ws.created_at, ws.updated_at,
+      pv.sku AS variant_sku, pv.size AS variant_size, pv.color AS variant_color,
+      p.name AS product_name, p.product_type, p.is_sellable, pc.name AS category_name, w.name AS warehouse_name,
+      (${INVENTORY_CATEGORY_CASE}) AS inventory_category
+    FROM warehouse_stock ws
+    JOIN product_variants pv ON pv.id = ws.product_variant_id
+    JOIN products p ON p.id = pv.product_id
+    LEFT JOIN product_categories pc ON pc.id = p.category_id
+    JOIN warehouses w ON w.id = ws.warehouse_id
+    WHERE ws.company_id = $1 AND ws.is_deleted = FALSE ${warehouseClause} ${categoryClause}
+    ORDER BY ws.created_at DESC
+    LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+  `;
+  const countSql = `
+    SELECT COUNT(*) FROM warehouse_stock ws
+    JOIN product_variants pv ON pv.id = ws.product_variant_id
+    JOIN products p ON p.id = pv.product_id
+    WHERE ws.company_id = $1 AND ws.is_deleted = FALSE ${warehouseClause} ${categoryClause}
+  `;
+
+  const [data, count] = await Promise.all([
+    query(dataSql, [...params, limit, offset]),
+    query(countSql, params),
+  ]);
   return { rows: data.rows, totalRecords: parseInt(count.rows[0].count, 10) };
 }
 
-module.exports = { lockOrCreateForUpdate, setQuantities, getStock, listByWarehouse };
+/** Totals per Salable / Office Consumable / Raw Material bucket — powers the Inventory page's summary tiles. */
+async function summarizeByCategory(companyId, warehouseId) {
+  const params = [companyId];
+  let warehouseClause = '';
+  if (warehouseId) {
+    params.push(warehouseId);
+    warehouseClause = `AND ws.warehouse_id = $${params.length}`;
+  }
+
+  const { rows } = await query(
+    `SELECT
+       (${INVENTORY_CATEGORY_CASE}) AS inventory_category,
+       COUNT(*) AS sku_count,
+       COALESCE(SUM(ws.quantity_on_hand), 0) AS total_on_hand,
+       COALESCE(SUM(ws.quantity_reserved), 0) AS total_reserved
+     FROM warehouse_stock ws
+     JOIN product_variants pv ON pv.id = ws.product_variant_id
+     JOIN products p ON p.id = pv.product_id
+     WHERE ws.company_id = $1 AND ws.is_deleted = FALSE ${warehouseClause}
+     GROUP BY inventory_category`,
+    params,
+  );
+  return rows;
+}
+
+module.exports = { lockOrCreateForUpdate, setQuantities, getStock, listByWarehouse, summarizeByCategory };

@@ -28,6 +28,11 @@ const printBill = Joi.object({
   orderId: Joi.string().guid().required(),
 });
 
+const updateBillStatus = Joi.object({
+  status: Joi.string().valid('unpaid', 'partial', 'paid'),
+  paidAmount: Joi.number().min(0),
+}).or('status', 'paidAmount');
+
 const createFiscalPeriod = Joi.object({
   periodStart: Joi.date().iso().required(),
   periodEnd: Joi.date().iso().min(Joi.ref('periodStart')).required(),
@@ -46,6 +51,7 @@ module.exports = {
   issuePaymentSlip,
   recordExpense,
   printBill,
+  updateBillStatus,
   createFiscalPeriod,
   recordStatutoryAudit,
 };

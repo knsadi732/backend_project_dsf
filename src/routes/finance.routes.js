@@ -22,6 +22,8 @@ router.post('/expenses', requirePermission('finance.expense.record'), validate(v
 
 router.get('/bills', requirePermission('finance.bill.print'), paginate, controller.listBills);
 router.post('/bills/print', requirePermission('finance.bill.print'), validate(v.printBill), controller.printBill);
+router.get('/bills/:id', requirePermission('finance.bill.print'), controller.getBill);
+router.patch('/bills/:id/status', requirePermission('finance.bill.print'), validate(v.updateBillStatus), controller.updateBillStatus);
 
 // CA scope
 router.get('/ledger/summary', requirePermission('finance.ledger.view'), controller.getLedgerSummary);

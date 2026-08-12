@@ -4,6 +4,7 @@ const notificationRepository = require('../../repositories/notification.reposito
 const notificationTemplateRepository = require('../../repositories/notificationTemplate.repository');
 const notificationService = require('../../services/notification.service');
 const mailer = require('../../utils/mailer');
+const { wrapWithLetterhead } = require('../../utils/emailLetterhead');
 const logger = require('../../utils/logger');
 
 /**
@@ -12,7 +13,12 @@ const logger = require('../../utils/logger');
  */
 async function deliver(notification, subject, renderedBody) {
   if (notification.channel === 'email') {
-    await mailer.sendMail({ to: notification.recipient, subject, text: renderedBody });
+    await mailer.sendMail({
+      to: notification.recipient,
+      subject,
+      text: renderedBody,
+      html: wrapWithLetterhead(renderedBody),
+    });
     return;
   }
   logger.info(`[notification:${notification.channel}] -> ${notification.recipient}: ${renderedBody}`);

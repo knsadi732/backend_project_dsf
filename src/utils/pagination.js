@@ -4,7 +4,7 @@
  */
 function parsePagination(query = {}) {
   const page = Math.max(parseInt(query.page, 10) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(query.limit, 10) || 10, 1), 200);
+  const limit = Math.min(Math.max(parseInt(query.limit, 10) || 10, 1), 1000);
   const search = typeof query.search === 'string' ? query.search : '';
   const sortBy = typeof query.sort_by === 'string' && query.sort_by.trim() ? query.sort_by : 'created_at';
   const sortOrder = query.sort_order === 'asc' ? 'asc' : 'desc';

@@ -53,8 +53,18 @@ const deleteProduct = asyncHandler(async (req, res) => {
 });
 
 const listStock = asyncHandler(async (req, res) => {
-  const { rows, meta } = await stockService.listStock(req.tenant.companyId, req.pagination, req.query.warehouse_id);
+  const { rows, meta } = await stockService.listStock(
+    req.tenant.companyId,
+    req.pagination,
+    req.query.warehouse_id,
+    req.query.inventory_category,
+  );
   return sendSuccess(res, { message: 'Warehouse stock.', data: rows, meta });
+});
+
+const getStockSummary = asyncHandler(async (req, res) => {
+  const summary = await stockService.getStockSummary(req.tenant.companyId, req.query.warehouse_id);
+  return sendSuccess(res, { message: 'Stock summary by inventory category.', data: summary });
 });
 
 const receiveStock = asyncHandler(async (req, res) => {
@@ -76,5 +86,6 @@ module.exports = {
   updateProduct,
   deleteProduct,
   listStock,
+  getStockSummary,
   receiveStock,
 };

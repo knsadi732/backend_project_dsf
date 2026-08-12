@@ -97,39 +97,78 @@ async function listExpenses(companyId, pagination) {
   return { rows, meta: buildPaginationMeta({ page: pagination.page, limit: pagination.limit, totalRecords }) };
 }
 
+/**
+ * Creates the invoice (bills row) for an order — takes an already-open
+ * transaction client so order.service.js can call this as part of the same
+ * transaction that marks the order "dispatched" (that's the moment a Sales
+ * Order's PDF flips from Proforma Invoice to Tax Invoice — see
+ * order.repository.js's dispatched_at stamp). Idempotent: re-dispatching
+ * (or a manual "print bill" call afterwards) just returns the existing bill.
+ */
+async function createBillForOrder(client, companyId, orderId, actorId) {
+  const existing = await billRepository.findByOrderId(companyId, orderId);
+  if (existing) return existing;
+
+  const order = await orderRepository.findById(companyId, orderId);
+  if (!order) throw new AppError('ORDER_002');
+
+  const billNumber = await settingsRepository.claimNextInvoiceNumber(client, companyId);
+  const dueDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const bill = await billRepository.create(
+    client,
+    companyId,
+    {
+      orderId,
+      billNumber,
+      customerId: order.customer_id,
+      gstAmount: order.tax_amount,
+      totalAmount: order.total_amount,
+      dueDate,
+      printedBy: actorId,
+    },
+    actorId,
+  );
+  await financeTransactionRepository.create(
+    client,
+    companyId,
+    { referenceType: 'order', referenceId: order.id, direction: 'credit', amount: order.total_amount, description: `Bill ${bill.bill_number}` },
+    actorId,
+  );
+  return bill;
+}
+
 async function printBill(companyId, orderId, actorId) {
   return withTransaction(
     async (client) => {
       await assertPostingDateOpen(companyId);
-
-      const existing = await billRepository.findByOrderId(companyId, orderId);
-      if (existing) return existing;
-
-      const order = await orderRepository.findById(companyId, orderId);
-      if (!order) throw new AppError('ORDER_002');
-
-      const billNumber = await settingsRepository.claimNextInvoiceNumber(client, companyId);
-      const bill = await billRepository.create(
-        client,
-        companyId,
-        { orderId, billNumber, gstAmount: order.tax_amount, totalAmount: order.total_amount, printedBy: actorId },
-        actorId,
-      );
-      await financeTransactionRepository.create(
-        client,
-        companyId,
-        { referenceType: 'order', referenceId: order.id, direction: 'credit', amount: order.total_amount, description: `Bill ${bill.bill_number}` },
-        actorId,
-      );
-      return bill;
+      return createBillForOrder(client, companyId, orderId, actorId);
     },
     { isolationLevel: 'REPEATABLE READ' },
   );
 }
 
-async function listBills(companyId, pagination) {
-  const { rows, totalRecords } = await billRepository.list(companyId, pagination);
+async function listBills(companyId, pagination, filters) {
+  const { rows, totalRecords } = await billRepository.list(companyId, pagination, filters);
   return { rows, meta: buildPaginationMeta({ page: pagination.page, limit: pagination.limit, totalRecords }) };
+}
+
+async function getBill(companyId, id) {
+  const bill = await billRepository.findById(companyId, id);
+  if (!bill) throw new AppError('COMMON_001');
+  return bill;
+}
+
+/** paidAmount is the total received so far (not just this payment) — balance_due = total_amount - paidAmount, floored at 0. */
+async function updateBillStatus(companyId, id, { status, paidAmount }, actorId) {
+  const bill = await billRepository.findById(companyId, id);
+  if (!bill) throw new AppError('COMMON_001');
+
+  const balanceDue = paidAmount != null ? Math.max(Number(bill.total_amount) - Number(paidAmount), 0) : undefined;
+  const resolvedStatus = status || (balanceDue === 0 ? 'paid' : balanceDue < Number(bill.total_amount) ? 'partial' : 'unpaid');
+
+  const updated = await billRepository.updateStatus(companyId, id, { status: resolvedStatus, balanceDue }, actorId);
+  if (!updated) throw new AppError('COMMON_001');
+  return updated;
 }
 
 // CA scope ------------------------------------------------------------------
@@ -182,8 +221,11 @@ module.exports = {
   listPaymentSlips,
   recordExpense,
   listExpenses,
+  createBillForOrder,
   printBill,
   listBills,
+  getBill,
+  updateBillStatus,
   getLedgerSummary,
   getGstProfile,
   crossVerifyLedger,

@@ -15,11 +15,11 @@ function getTransporter() {
   return transporter;
 }
 
-async function sendMail({ to, subject, text }) {
+async function sendMail({ to, subject, text, html }) {
   if (!env.smtp.user || !env.smtp.pass) {
     throw new Error('SMTP_USER/SMTP_PASS are not configured — cannot send email.');
   }
-  return getTransporter().sendMail({ from: env.smtp.from, to, subject, text });
+  return getTransporter().sendMail({ from: env.smtp.from, to, subject, text, html });
 }
 
 module.exports = { sendMail };

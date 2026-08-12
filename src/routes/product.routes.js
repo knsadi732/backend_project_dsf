@@ -16,6 +16,7 @@ router.patch('/categories/:id', requirePermission('product.manage'), validate(v.
 router.delete('/categories/:id', requirePermission('product.manage'), controller.deleteCategory);
 
 router.get('/stock', requirePermission('product.manage'), paginate, controller.listStock);
+router.get('/stock/summary', requirePermission('product.manage'), controller.getStockSummary);
 router.post('/stock/receive', requirePermission('product.manage'), validate(v.receiveStock), controller.receiveStock);
 
 router.get('/', requirePermission('product.manage'), paginate, controller.listProducts);

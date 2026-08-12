@@ -22,10 +22,20 @@ async function findById(companyId, id) {
 
 async function create(companyId, fields, createdBy) {
   const { rows } = await query(
-    `INSERT INTO customers (company_id, name, phone, email, gstin, billing_address, shipping_address, created_by, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+    `INSERT INTO customers (company_id, name, phone, email, gstin, billing_address, shipping_address, customer_type, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'retail'), $9, $9)
      RETURNING *`,
-    [companyId, fields.name, fields.phone, fields.email, fields.gstin, fields.billingAddress, fields.shippingAddress, createdBy],
+    [
+      companyId,
+      fields.name,
+      fields.phone,
+      fields.email,
+      fields.gstin,
+      fields.billingAddress,
+      fields.shippingAddress,
+      fields.customerType,
+      createdBy,
+    ],
   );
   return rows[0];
 }
@@ -36,7 +46,8 @@ async function update(companyId, id, fields, updatedBy) {
      SET name = COALESCE($3, name), phone = COALESCE($4, phone), email = COALESCE($5, email),
          gstin = COALESCE($6, gstin), billing_address = COALESCE($7, billing_address),
          shipping_address = COALESCE($8, shipping_address), status = COALESCE($9, status),
-         updated_by = $10, updated_at = now()
+         customer_type = COALESCE($10, customer_type),
+         updated_by = $11, updated_at = now()
      WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE
      RETURNING *`,
     [
@@ -49,6 +60,7 @@ async function update(companyId, id, fields, updatedBy) {
       fields.billingAddress,
       fields.shippingAddress,
       fields.status,
+      fields.customerType,
       updatedBy,
     ],
   );

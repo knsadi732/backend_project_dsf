@@ -5,12 +5,15 @@ const { assertTransition } = require('../utils/stateMachine');
 const { ORDER_STATUS, ORDER_STATUS_PIPELINE, PAYMENT_STATUS_PIPELINE } = require('../constants/enums');
 const orderRepository = require('../repositories/order.repository');
 const stockService = require('./stock.service');
+const financeService = require('./finance.service');
+const workOrderService = require('./workOrder.service');
 
 async function createOrder(companyId, { branchId, warehouseId, customerId, items }, actorId) {
   return withTransaction(async (client) => {
     let subtotal = 0;
     let taxAmount = 0;
     const priced = [];
+    const productByVariantId = {};
 
     for (const item of items) {
       const { rows } = await client.query(
@@ -22,9 +25,14 @@ async function createOrder(companyId, { branchId, warehouseId, customerId, items
       );
       const variant = rows[0];
       if (!variant) throw new AppError('INV_002');
+      productByVariantId[item.productVariantId] = variant.product_id;
 
-      const lineSubtotal = Number(variant.selling_price) * Number(item.quantity);
-      const lineTax = (lineSubtotal * Number(variant.gst_percentage)) / 100;
+      // selling_price is GST-inclusive (the price the customer actually pays)
+      // — back out the taxable value and tax from it rather than adding tax
+      // on top.
+      const lineInclusive = Number(variant.selling_price) * Number(item.quantity);
+      const lineSubtotal = lineInclusive / (1 + Number(variant.gst_percentage) / 100);
+      const lineTax = lineInclusive - lineSubtotal;
       subtotal += lineSubtotal;
       taxAmount += lineTax;
 
@@ -33,7 +41,7 @@ async function createOrder(companyId, { branchId, warehouseId, customerId, items
         quantity: item.quantity,
         unitPrice: variant.selling_price,
         taxRate: variant.gst_percentage,
-        lineTotal: lineSubtotal + lineTax,
+        lineTotal: lineInclusive,
       });
     }
 
@@ -44,6 +52,32 @@ async function createOrder(companyId, { branchId, warehouseId, customerId, items
       actorId,
     );
     await orderRepository.createItems(client, order.id, priced);
+
+    // Raise a work order for whatever this order needs that on-hand stock
+    // can't cover — production qty = required - available. Advisory only
+    // (a plain read, not the pessimistic lock reserveStock takes at
+    // "confirmed") since the goal here is just to flag the shortfall for
+    // manufacturing, not to hold stock.
+    for (const item of priced) {
+      const stock = await stockService.getStock(companyId, warehouseId, item.productVariantId);
+      const available = stock ? Number(stock.quantity_on_hand) - Number(stock.quantity_reserved) : 0;
+      const required = Number(item.quantity);
+      if (required > available) {
+        const shortfall = required - Math.max(available, 0);
+        await workOrderService.createShortfallWorkOrder(
+          client,
+          companyId,
+          {
+            productId: productByVariantId[item.productVariantId],
+            productVariantId: item.productVariantId,
+            salesOrderId: order.id,
+            quantity: shortfall,
+          },
+          actorId,
+        );
+      }
+    }
+
     return order;
   });
 }
@@ -64,6 +98,12 @@ async function listOrders(companyId, pagination, filters) {
  * Order Lifecycle Pipeline (plan.md Chapter 4): Pending -> Confirmed (stock
  * reserved) -> Packed -> Dispatched (reservation fulfilled/deducted) ->
  * Delivered -> Completed. Runs REPEATABLE READ since it touches inventory.
+ *
+ * Confirming never blocks on a stock shortfall — reserveAvailable reserves
+ * whatever's on hand and reports the rest, and that rest becomes a work
+ * order (createShortfallWorkOrder, deduped per order+product) right here in
+ * the same transaction, so the sale and the resulting production need land
+ * atomically together.
  */
 async function transitionOrder(companyId, id, nextStatus, actorId) {
   return withTransaction(
@@ -76,15 +116,31 @@ async function transitionOrder(companyId, id, nextStatus, actorId) {
         const items = await orderRepository.findItems(id);
         for (const item of items) {
           if (nextStatus === ORDER_STATUS.CONFIRMED) {
-            await stockService.reserveStock(client, companyId, order.warehouse_id, item.product_variant_id, item.quantity);
+            const { shortfall } = await stockService.reserveAvailable(client, companyId, order.warehouse_id, item.product_variant_id, item.quantity);
+            if (shortfall > 0) {
+              await workOrderService.createShortfallWorkOrder(
+                client,
+                companyId,
+                { productId: item.product_id, productVariantId: item.product_variant_id, salesOrderId: id, quantity: shortfall },
+                actorId,
+              );
+            }
           } else {
-            await stockService.fulfillReservation(client, companyId, order.warehouse_id, item.product_variant_id, item.quantity);
+            await stockService.fulfillReservation(client, companyId, order.warehouse_id, item.product_variant_id, item.quantity, actorId);
           }
         }
       }
 
       const updated = await orderRepository.updateStatus(client, id, order.version, { status: nextStatus }, actorId);
       if (!updated) throw new AppError('ORDER_001', [], 'Order was modified concurrently — retry the transition.');
+
+      // Dispatch is the line between a Proforma Invoice and a final Tax
+      // Invoice on the sales-order PDF — auto-generate the invoice (bills
+      // row) right here rather than requiring a separate manual step.
+      if (nextStatus === ORDER_STATUS.DISPATCHED) {
+        await financeService.createBillForOrder(client, companyId, id, actorId);
+      }
+
       return updated;
     },
     { isolationLevel: 'REPEATABLE READ' },

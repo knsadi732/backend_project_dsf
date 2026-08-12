@@ -23,6 +23,7 @@ const PERMISSIONS = [
   ['customer.manage', 'customer', 'Manage customer records.'],
   ['vendor.manage', 'vendor', 'Manage vendor records.'],
   ['order.manage', 'order', 'Create orders and drive order lifecycle transitions.'],
+  ['work_order.manage', 'production', 'Create and manage manufacturing work orders.'],
   ['purchase_order.manage', 'purchase_order', 'Create purchase orders and drive PO lifecycle transitions.'],
   ['purchase_request.view', 'purchase_request', 'View purchase requests.'],
   ['purchase_request.create', 'purchase_request', 'Raise purchase requests.'],

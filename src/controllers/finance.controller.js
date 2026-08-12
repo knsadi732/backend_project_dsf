@@ -41,8 +41,22 @@ const printBill = asyncHandler(async (req, res) => {
 });
 
 const listBills = asyncHandler(async (req, res) => {
-  const { rows, meta } = await financeService.listBills(req.tenant.companyId, req.pagination);
+  const { rows, meta } = await financeService.listBills(req.tenant.companyId, req.pagination, {
+    status: req.query.status,
+    dateFrom: req.query.date_from,
+    dateTo: req.query.date_to,
+  });
   return sendSuccess(res, { message: 'Bills list.', data: rows, meta });
+});
+
+const getBill = asyncHandler(async (req, res) => {
+  const bill = await financeService.getBill(req.tenant.companyId, req.params.id);
+  return sendSuccess(res, { message: 'Bill detail.', data: bill });
+});
+
+const updateBillStatus = asyncHandler(async (req, res) => {
+  const bill = await financeService.updateBillStatus(req.tenant.companyId, req.params.id, req.body, req.user.id);
+  return sendSuccess(res, { message: 'Bill status updated.', data: bill });
 });
 
 const getLedgerSummary = asyncHandler(async (req, res) => {
@@ -94,6 +108,8 @@ module.exports = {
   listExpenses,
   printBill,
   listBills,
+  getBill,
+  updateBillStatus,
   getLedgerSummary,
   listFiscalPeriods,
   createFiscalPeriod,

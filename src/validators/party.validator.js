@@ -1,5 +1,7 @@
 const Joi = require('joi');
 
+const CUSTOMER_TYPES = ['retail', 'wholesale', 'distributor', 'dealer', 'corporate', 'franchise', 'marketplace'];
+
 const createCustomer = Joi.object({
   name: Joi.string().max(255).required(),
   phone: Joi.string().max(30).allow(null, ''),
@@ -7,6 +9,7 @@ const createCustomer = Joi.object({
   gstin: Joi.string().max(20).allow(null, ''),
   billingAddress: Joi.string().allow(null, ''),
   shippingAddress: Joi.string().allow(null, ''),
+  customerType: Joi.string().valid(...CUSTOMER_TYPES).allow(null),
 });
 
 const updateCustomer = createCustomer.fork(['name'], (s) => s.optional()).keys({
