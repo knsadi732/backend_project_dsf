@@ -26,6 +26,8 @@ const loanRoutes = require('./loan.routes');
 const notificationRoutes = require('./notification.routes');
 const analyticsRoutes = require('./analytics.routes');
 const workOrderRoutes = require('./workOrder.routes');
+const bomRoutes = require('./bom.routes');
+const materialIssueRequestRoutes = require('./materialIssueRequest.routes');
 
 const router = Router();
 
@@ -60,6 +62,8 @@ router.use('/loans', loanRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/work-orders', workOrderRoutes);
+router.use('/bom', bomRoutes);
+router.use('/material-issue-requests', materialIssueRequestRoutes);
 router.use('/', companyRoutes); // exposes /company, /branches, /warehouses, /settings
 
 module.exports = router;

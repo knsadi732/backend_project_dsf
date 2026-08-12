@@ -52,6 +52,9 @@ const ERROR_CODES = {
 
   DOC_001: { httpStatus: 404, message: 'Document not found.' },
 
+  MIR_001: { httpStatus: 400, message: 'Attempted material issue request state transition violates defined state engine flow rules.' },
+  MIR_002: { httpStatus: 404, message: 'Material issue request not found.' },
+
   VALIDATION_001: { httpStatus: 400, message: 'Request payload failed validation.' },
 
   COMMON_001: { httpStatus: 404, message: 'Resource not found.' },

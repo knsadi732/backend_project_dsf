@@ -71,6 +71,7 @@ async function createOrder(companyId, { branchId, warehouseId, customerId, items
             productId: productByVariantId[item.productVariantId],
             productVariantId: item.productVariantId,
             salesOrderId: order.id,
+            warehouseId,
             quantity: shortfall,
           },
           actorId,
@@ -121,7 +122,7 @@ async function transitionOrder(companyId, id, nextStatus, actorId) {
               await workOrderService.createShortfallWorkOrder(
                 client,
                 companyId,
-                { productId: item.product_id, productVariantId: item.product_variant_id, salesOrderId: id, quantity: shortfall },
+                { productId: item.product_id, productVariantId: item.product_variant_id, salesOrderId: id, warehouseId: order.warehouse_id, quantity: shortfall },
                 actorId,
               );
             }

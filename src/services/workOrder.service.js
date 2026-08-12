@@ -2,9 +2,18 @@ const AppError = require('../utils/AppError');
 const { withTransaction } = require('../config/db');
 const { buildPaginationMeta } = require('../utils/pagination');
 const workOrderRepository = require('../repositories/workOrder.repository');
+// materialIssueRequest.service.js, not its repository — the MIR-creation
+// logic itself (BOM lookup, item snapshot) lives there so it's shared with
+// nothing else; no circularity risk since that module doesn't reach back
+// into this one.
+const materialIssueRequestService = require('./materialIssueRequest.service');
 
 async function createWorkOrder(companyId, payload, actorId) {
-  return withTransaction((client) => workOrderRepository.create(client, companyId, payload, actorId));
+  return withTransaction(async (client) => {
+    const workOrder = await workOrderRepository.create(client, companyId, payload, actorId);
+    await materialIssueRequestService.createForWorkOrder(client, companyId, workOrder, actorId);
+    return workOrder;
+  });
 }
 
 async function getWorkOrder(companyId, id) {
@@ -42,13 +51,23 @@ async function deleteWorkOrder(companyId, id, actorId) {
  * order+variant — confirm can only be attempted once per order (it
  * succeeds), but this keeps a retried call safe regardless. production qty
  * = required - available (never negative — callers only invoke this once
- * they've confirmed a shortfall).
+ * they've confirmed a shortfall). Also raises a pending-approval Material
+ * Issue Request for the new WO's BOM (materialIssueRequest.service.js) —
+ * raw material isn't reserved yet, that only happens once a Production
+ * Manager approves it.
  */
-async function createShortfallWorkOrder(client, companyId, { productId, productVariantId, salesOrderId, quantity }, actorId) {
+async function createShortfallWorkOrder(client, companyId, { productId, productVariantId, salesOrderId, warehouseId, quantity }, actorId) {
   const existing = await workOrderRepository.findBySalesOrderAndVariant(client, companyId, salesOrderId, productVariantId);
   if (existing) return existing;
 
-  return workOrderRepository.create(client, companyId, { productId, productVariantId, salesOrderId, quantity, stage: 'pending' }, actorId);
+  const workOrder = await workOrderRepository.create(
+    client,
+    companyId,
+    { productId, productVariantId, salesOrderId, warehouseId, quantity, stage: 'pending' },
+    actorId,
+  );
+  await materialIssueRequestService.createForWorkOrder(client, companyId, workOrder, actorId);
+  return workOrder;
 }
 
 const LOW_STOCK_THRESHOLD = 10;
@@ -63,19 +82,21 @@ const LOW_STOCK_THRESHOLD = 10;
  * low — deduped per variant, not per product, since different sizes of the
  * same product can each independently run low).
  */
-async function checkLowStockAndReplenish(client, companyId, productId, productVariantId, quantityOnHand, actorId) {
+async function checkLowStockAndReplenish(client, companyId, productId, productVariantId, warehouseId, quantityOnHand, actorId) {
   if (Number(quantityOnHand) >= LOW_STOCK_THRESHOLD) return null;
 
   const existing = await workOrderRepository.findOpenReplenishmentByVariant(client, companyId, productVariantId);
   if (existing) return existing;
 
   const quantity = LOW_STOCK_THRESHOLD - Number(quantityOnHand);
-  return workOrderRepository.create(
+  const workOrder = await workOrderRepository.create(
     client,
     companyId,
-    { productId, productVariantId, salesOrderId: null, quantity, stage: 'pending' },
+    { productId, productVariantId, salesOrderId: null, warehouseId, quantity, stage: 'pending' },
     actorId,
   );
+  await materialIssueRequestService.createForWorkOrder(client, companyId, workOrder, actorId);
+  return workOrder;
 }
 
 module.exports = {

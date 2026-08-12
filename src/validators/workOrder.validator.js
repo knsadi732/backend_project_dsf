@@ -5,6 +5,7 @@ const STAGES = ['pending', 'in_progress', 'completed', 'cancelled'];
 const createWorkOrder = Joi.object({
   productId: Joi.string().guid().required(),
   productVariantId: Joi.string().guid().allow(null),
+  warehouseId: Joi.string().guid().allow(null),
   salesOrderId: Joi.string().guid().allow(null),
   workOrderNumber: Joi.string().max(50).allow(null, ''),
   quantity: Joi.number().positive().required(),

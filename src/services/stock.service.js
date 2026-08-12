@@ -64,7 +64,7 @@ async function fulfillReservation(client, companyId, warehouseId, productVariant
 
   const { rows } = await client.query('SELECT product_id FROM product_variants WHERE id = $1', [productVariantId]);
   if (rows[0]) {
-    await workOrderService.checkLowStockAndReplenish(client, companyId, rows[0].product_id, productVariantId, nextOnHand, actorId);
+    await workOrderService.checkLowStockAndReplenish(client, companyId, rows[0].product_id, productVariantId, warehouseId, nextOnHand, actorId);
   }
 
   return updated;

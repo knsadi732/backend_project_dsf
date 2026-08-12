@@ -6,11 +6,12 @@ function generateWorkOrderNumber() {
 }
 
 const SELECT_WITH_JOINS = `
-  SELECT wo.*, p.name AS product_name, pv.sku, pv.size, pv.color, o.order_number AS sales_order_number
+  SELECT wo.*, p.name AS product_name, pv.sku, pv.size, pv.color, o.order_number AS sales_order_number, w.name AS warehouse_name
   FROM work_orders wo
   JOIN products p ON p.id = wo.product_id
   LEFT JOIN product_variants pv ON pv.id = wo.product_variant_id
   LEFT JOIN orders o ON o.id = wo.sales_order_id
+  LEFT JOIN warehouses w ON w.id = wo.warehouse_id
 `;
 
 async function create(
@@ -20,6 +21,7 @@ async function create(
     productId,
     productVariantId,
     salesOrderId,
+    warehouseId,
     workOrderNumber,
     quantity,
     stage,
@@ -36,18 +38,19 @@ async function create(
 ) {
   const { rows } = await client.query(
     `INSERT INTO work_orders (
-       company_id, product_id, product_variant_id, sales_order_id, work_order_number, quantity, stage, due_date,
+       company_id, product_id, product_variant_id, sales_order_id, warehouse_id, work_order_number, quantity, stage, due_date,
        raw_material_cost, labour_cost, machine_cost, electricity_cost, packaging_cost, overhead_cost,
        remarks, created_by, updated_by
      )
-     VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'pending'), $8, COALESCE($9, 0), COALESCE($10, 0), COALESCE($11, 0),
-             COALESCE($12, 0), COALESCE($13, 0), COALESCE($14, 0), $15, $16, $16)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'pending'), $9, COALESCE($10, 0), COALESCE($11, 0), COALESCE($12, 0),
+             COALESCE($13, 0), COALESCE($14, 0), COALESCE($15, 0), $16, $17, $17)
      RETURNING *`,
     [
       companyId,
       productId,
       productVariantId || null,
       salesOrderId || null,
+      warehouseId || null,
       workOrderNumber || generateWorkOrderNumber(),
       quantity,
       stage,
