@@ -1,6 +1,7 @@
 const AppError = require('../utils/AppError');
 const { buildPaginationMeta } = require('../utils/pagination');
 const stockRepository = require('../repositories/stock.repository');
+const inventoryMovementRepository = require('../repositories/inventoryMovement.repository');
 const workOrderService = require('./workOrder.service');
 
 /**
@@ -25,7 +26,7 @@ async function reserveStock(client, companyId, warehouseId, productVariantId, qu
  * blocking. Order confirmation uses this: a short order still confirms,
  * with the gap flagged as a work order rather than failing outright.
  */
-async function reserveAvailable(client, companyId, warehouseId, productVariantId, quantity) {
+async function reserveAvailable(client, companyId, warehouseId, productVariantId, quantity, { referenceType, referenceId, actorId } = {}) {
   const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, productVariantId);
   const available = Math.max(Number(stock.quantity_on_hand) - Number(stock.quantity_reserved), 0);
   const required = Number(quantity);
@@ -36,6 +37,23 @@ async function reserveAvailable(client, companyId, warehouseId, productVariantId
     quantityOnHand: stock.quantity_on_hand,
     quantityReserved: Number(stock.quantity_reserved) + reserveQty,
   });
+  if (reserveQty > 0) {
+    await inventoryMovementRepository.record(
+      client,
+      companyId,
+      {
+        warehouseId,
+        productVariantId,
+        movementType: 'sales_reservation',
+        quantityReservedChange: reserveQty,
+        quantityOnHandAfter: updated.quantity_on_hand,
+        quantityReservedAfter: updated.quantity_reserved,
+        referenceType,
+        referenceId,
+      },
+      actorId,
+    );
+  }
   return { stock: updated, shortfall };
 }
 
@@ -55,12 +73,29 @@ async function releaseReservation(client, companyId, warehouseId, productVariant
  * where a dip below the low-stock threshold gets caught and a replenishment
  * work order raised (workOrder.service.js checkLowStockAndReplenish).
  */
-async function fulfillReservation(client, companyId, warehouseId, productVariantId, quantity, actorId) {
+async function fulfillReservation(client, companyId, warehouseId, productVariantId, quantity, actorId, { referenceType, referenceId } = {}) {
   const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, productVariantId);
   const nextOnHand = Number(stock.quantity_on_hand) - Number(quantity);
   const nextReserved = Math.max(Number(stock.quantity_reserved) - Number(quantity), 0);
 
   const updated = await stockRepository.setQuantities(client, stock.id, { quantityOnHand: nextOnHand, quantityReserved: nextReserved });
+
+  await inventoryMovementRepository.record(
+    client,
+    companyId,
+    {
+      warehouseId,
+      productVariantId,
+      movementType: 'dispatch',
+      quantityChange: -Number(quantity),
+      quantityReservedChange: nextReserved - Number(stock.quantity_reserved),
+      quantityOnHandAfter: updated.quantity_on_hand,
+      quantityReservedAfter: updated.quantity_reserved,
+      referenceType,
+      referenceId,
+    },
+    actorId,
+  );
 
   const { rows } = await client.query('SELECT product_id FROM product_variants WHERE id = $1', [productVariantId]);
   if (rows[0]) {
@@ -70,12 +105,28 @@ async function fulfillReservation(client, companyId, warehouseId, productVariant
   return updated;
 }
 
-async function receiveStock(client, companyId, warehouseId, productVariantId, quantity) {
+async function receiveStock(client, companyId, warehouseId, productVariantId, quantity, { referenceType, referenceId, actorId, movementType = 'purchase_receipt' } = {}) {
   const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, productVariantId);
-  return stockRepository.setQuantities(client, stock.id, {
+  const updated = await stockRepository.setQuantities(client, stock.id, {
     quantityOnHand: Number(stock.quantity_on_hand) + Number(quantity),
     quantityReserved: stock.quantity_reserved,
   });
+  await inventoryMovementRepository.record(
+    client,
+    companyId,
+    {
+      warehouseId,
+      productVariantId,
+      movementType,
+      quantityChange: Number(quantity),
+      quantityOnHandAfter: updated.quantity_on_hand,
+      quantityReservedAfter: updated.quantity_reserved,
+      referenceType,
+      referenceId,
+    },
+    actorId,
+  );
+  return updated;
 }
 
 async function getStock(companyId, warehouseId, productVariantId) {

@@ -35,6 +35,21 @@ const listExpenses = asyncHandler(async (req, res) => {
   return sendSuccess(res, { message: 'Expenses list.', data: rows, meta });
 });
 
+const quickEntry = asyncHandler(async (req, res) => {
+  const tx = await financeService.quickEntry(req.tenant.companyId, req.body, req.user.id);
+  return sendSuccess(res, { message: 'Ledger entry recorded.', data: tx, statusCode: 201 });
+});
+
+const createFundingSource = asyncHandler(async (req, res) => {
+  const source = await financeService.createFundingSource(req.tenant.companyId, req.body, req.user.id);
+  return sendSuccess(res, { message: 'Funding source created.', data: source, statusCode: 201 });
+});
+
+const listFundingSources = asyncHandler(async (req, res) => {
+  const { rows, meta } = await financeService.listFundingSources(req.tenant.companyId, req.pagination);
+  return sendSuccess(res, { message: 'Funding sources list.', data: rows, meta });
+});
+
 const printBill = asyncHandler(async (req, res) => {
   const bill = await financeService.printBill(req.tenant.companyId, req.body.orderId, req.user.id);
   return sendSuccess(res, { message: 'Bill generated.', data: bill, statusCode: 201 });
@@ -106,6 +121,9 @@ module.exports = {
   listPaymentSlips,
   recordExpense,
   listExpenses,
+  quickEntry,
+  createFundingSource,
+  listFundingSources,
   printBill,
   listBills,
   getBill,

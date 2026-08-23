@@ -6,12 +6,12 @@ function generateOrderNumber() {
   return `ORD-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
 }
 
-async function create(client, companyId, { branchId, warehouseId, customerId, subtotal, taxAmount, totalAmount }, createdBy) {
+async function create(client, companyId, { branchId, warehouseId, customerId, subtotal, taxAmount, totalAmount, promisedDeliveryDate }, createdBy) {
   const { rows } = await client.query(
-    `INSERT INTO orders (company_id, branch_id, warehouse_id, customer_id, order_number, subtotal, tax_amount, total_amount, created_by, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+    `INSERT INTO orders (company_id, branch_id, warehouse_id, customer_id, order_number, subtotal, tax_amount, total_amount, promised_delivery_date, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
      RETURNING *`,
-    [companyId, branchId, warehouseId, customerId, generateOrderNumber(), subtotal, taxAmount, totalAmount, createdBy],
+    [companyId, branchId, warehouseId, customerId, generateOrderNumber(), subtotal, taxAmount, totalAmount, promisedDeliveryDate || null, createdBy],
   );
   return rows[0];
 }

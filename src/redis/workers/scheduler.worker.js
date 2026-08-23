@@ -7,6 +7,7 @@ const runSessionCleanup = require('../../jobs/sessionCleanup.job');
 const runReportGeneration = require('../../jobs/reportGeneration.job');
 const runNotificationRetry = require('../../jobs/notificationRetry.job');
 const runRedisCleanup = require('../../jobs/redisCleanup.job');
+const runRecurringCharges = require('../../jobs/recurringCharges.job');
 
 const HANDLERS = {
   'db-backup': runDbBackup,
@@ -14,6 +15,7 @@ const HANDLERS = {
   'report-generation': runReportGeneration,
   'notification-retry': runNotificationRetry,
   'redis-cleanup': runRedisCleanup,
+  'recurring-charges': runRecurringCharges,
 };
 
 function startSchedulerWorker() {

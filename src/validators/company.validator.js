@@ -42,6 +42,8 @@ const updateSettings = Joi.object({
   fiscalYearStartMonth: Joi.number().integer().min(1).max(12),
   gstSettings: Joi.object().unknown(true),
   notificationSettings: Joi.object().unknown(true),
+  // Dashboard KPI: today's actual completed Work Order quantity vs this.
+  dailyProductionTarget: Joi.number().integer().min(0).allow(null),
 });
 
 module.exports = { updateCompany, createBranch, updateBranch, createWarehouse, updateWarehouse, updateSettings };

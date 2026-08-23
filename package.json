@@ -8,6 +8,8 @@
     "dev": "nodemon src/server.js",
     "migrate": "node src/database/migrate.js",
     "seed": "node src/database/seed.js",
+    "reset:dev-data": "node scripts/reset-dev-data.js",
+    "seed:owner-ledger": "node scripts/seed-owner-ledger.js",
     "worker": "node src/worker.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

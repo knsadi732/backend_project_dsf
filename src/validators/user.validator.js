@@ -14,7 +14,12 @@ const createUser = Joi.object({
 });
 
 const updateUser = Joi.object({
+  branchId: Joi.string().guid().allow(null),
+  warehouseId: Joi.string().guid().allow(null),
   fullName: Joi.string().max(255),
+  email: Joi.string().email(),
+  phone: Joi.string().max(20).allow(null, ''),
+  password: Joi.string().min(6),
   roleId: Joi.string().guid(),
   additionalRoleIds: Joi.array().items(Joi.string().guid()),
   department: Joi.string().max(100).allow(null, ''),

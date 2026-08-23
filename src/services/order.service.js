@@ -8,7 +8,7 @@ const stockService = require('./stock.service');
 const financeService = require('./finance.service');
 const workOrderService = require('./workOrder.service');
 
-async function createOrder(companyId, { branchId, warehouseId, customerId, items }, actorId) {
+async function createOrder(companyId, { branchId, warehouseId, customerId, items, promisedDeliveryDate }, actorId) {
   return withTransaction(async (client) => {
     let subtotal = 0;
     let taxAmount = 0;
@@ -48,7 +48,7 @@ async function createOrder(companyId, { branchId, warehouseId, customerId, items
     const order = await orderRepository.create(
       client,
       companyId,
-      { branchId, warehouseId, customerId, subtotal, taxAmount, totalAmount: subtotal + taxAmount },
+      { branchId, warehouseId, customerId, subtotal, taxAmount, totalAmount: subtotal + taxAmount, promisedDeliveryDate },
       actorId,
     );
     await orderRepository.createItems(client, order.id, priced);
@@ -117,7 +117,7 @@ async function transitionOrder(companyId, id, nextStatus, actorId) {
         const items = await orderRepository.findItems(id);
         for (const item of items) {
           if (nextStatus === ORDER_STATUS.CONFIRMED) {
-            const { shortfall } = await stockService.reserveAvailable(client, companyId, order.warehouse_id, item.product_variant_id, item.quantity);
+            const { shortfall } = await stockService.reserveAvailable(client, companyId, order.warehouse_id, item.product_variant_id, item.quantity, { referenceType: 'order', referenceId: id, actorId });
             if (shortfall > 0) {
               await workOrderService.createShortfallWorkOrder(
                 client,
@@ -127,7 +127,7 @@ async function transitionOrder(companyId, id, nextStatus, actorId) {
               );
             }
           } else {
-            await stockService.fulfillReservation(client, companyId, order.warehouse_id, item.product_variant_id, item.quantity, actorId);
+            await stockService.fulfillReservation(client, companyId, order.warehouse_id, item.product_variant_id, item.quantity, actorId, { referenceType: 'order', referenceId: id });
           }
         }
       }

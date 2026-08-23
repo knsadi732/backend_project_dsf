@@ -1,6 +1,10 @@
 const Joi = require('joi');
 
 const STAGES = ['pending', 'in_progress', 'completed', 'cancelled'];
+// Shop-floor position — separate from `stage` (which only tracks the coarse
+// pending/in_progress/completed/cancelled lifecycle). Sequential, advanced
+// one step at a time via PATCH /:id/floor-stage.
+const FLOOR_STAGES = ['cutting', 'stitching', 'lasting', 'finishing'];
 
 const createWorkOrder = Joi.object({
   productId: Joi.string().guid().required(),
@@ -31,6 +35,16 @@ const updateWorkOrder = Joi.object({
   packagingCost: Joi.number().min(0),
   overheadCost: Joi.number().min(0),
   remarks: Joi.string().allow(null, ''),
+  // Units actually produced — set (or corrected) when the batch reaches
+  // "completed"; may differ from the planned `quantity`. Feeds Material
+  // Waste Variance and Daily Production Output.
+  actualQuantity: Joi.number().min(0).allow(null),
 });
 
-module.exports = { createWorkOrder, updateWorkOrder };
+const advanceFloorStage = Joi.object({
+  floorStage: Joi.string()
+    .valid(...FLOOR_STAGES)
+    .required(),
+});
+
+module.exports = { createWorkOrder, updateWorkOrder, advanceFloorStage, FLOOR_STAGES };

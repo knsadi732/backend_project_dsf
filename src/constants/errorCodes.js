@@ -54,6 +54,11 @@ const ERROR_CODES = {
 
   MIR_001: { httpStatus: 400, message: 'Attempted material issue request state transition violates defined state engine flow rules.' },
   MIR_002: { httpStatus: 404, message: 'Material issue request not found.' },
+  MIR_003: { httpStatus: 400, message: 'Item does not belong to this material issue request.' },
+  MIR_004: { httpStatus: 400, message: 'Requested issue quantity exceeds the remaining balance or available stock.' },
+
+  APR_001: { httpStatus: 404, message: 'Approval request not found.' },
+  APR_002: { httpStatus: 400, message: 'Approval request is not pending — it has already been approved or rejected, or was modified concurrently.' },
 
   VALIDATION_001: { httpStatus: 400, message: 'Request payload failed validation.' },
 

@@ -10,6 +10,7 @@ const createCustomer = Joi.object({
   billingAddress: Joi.string().allow(null, ''),
   shippingAddress: Joi.string().allow(null, ''),
   customerType: Joi.string().valid(...CUSTOMER_TYPES).allow(null),
+  creditLimit: Joi.number().min(0).default(0),
 });
 
 const updateCustomer = createCustomer.fork(['name'], (s) => s.optional()).keys({

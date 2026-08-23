@@ -20,6 +20,11 @@ router.post('/payment-slips', requirePermission('finance.payment_slip.issue'), v
 router.get('/expenses', requirePermission('finance.expense.record'), paginate, controller.listExpenses);
 router.post('/expenses', requirePermission('finance.expense.record'), validate(v.recordExpense), controller.recordExpense);
 
+router.post('/quick-entry', requirePermission('finance.transaction.create'), validate(v.quickEntry), controller.quickEntry);
+
+router.get('/funding-sources', requirePermission('finance.transaction.create'), paginate, controller.listFundingSources);
+router.post('/funding-sources', requirePermission('finance.transaction.create'), validate(v.createFundingSource), controller.createFundingSource);
+
 router.get('/bills', requirePermission('finance.bill.print'), paginate, controller.listBills);
 router.post('/bills/print', requirePermission('finance.bill.print'), validate(v.printBill), controller.printBill);
 router.get('/bills/:id', requirePermission('finance.bill.print'), controller.getBill);

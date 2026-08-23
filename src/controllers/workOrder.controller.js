@@ -27,4 +27,9 @@ const remove = asyncHandler(async (req, res) => {
   return sendSuccess(res, { message: 'Work order deleted.' });
 });
 
-module.exports = { create, list, getOne, update, remove };
+const advanceFloorStage = asyncHandler(async (req, res) => {
+  const workOrder = await workOrderService.advanceFloorStage(req.tenant.companyId, req.params.id, req.body.floorStage, req.user.id);
+  return sendSuccess(res, { message: 'Floor stage advanced.', data: workOrder });
+});
+
+module.exports = { create, list, getOne, update, remove, advanceFloorStage };

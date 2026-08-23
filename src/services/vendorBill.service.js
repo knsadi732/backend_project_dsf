@@ -55,49 +55,59 @@ async function listVendorBills(companyId, pagination, filters) {
   return { rows: withUrls, meta: buildPaginationMeta({ page: pagination.page, limit: pagination.limit, totalRecords }) };
 }
 
+/**
+ * Core payment write, parameterized on an already-open transaction `client`
+ * — shared by the standalone endpoint (recordPayment, which opens its own
+ * transaction) and approvalRequest.service.js's approve() (which needs this
+ * to commit atomically with the approval's own status flip, in the SAME
+ * transaction — withTransaction doesn't nest, so it can't just call
+ * recordPayment directly).
+ */
+async function recordPaymentWithClient(client, companyId, id, { amount, utrNumber }, actorId) {
+  const existing = await vendorBillRepository.findByIdForUpdate(client, companyId, id);
+  if (!existing) throw new AppError('VB_001');
+
+  const newAmountPaid = Number(existing.amount_paid) + Number(amount);
+  if (newAmountPaid > Number(existing.total_amount)) throw new AppError('VB_002');
+
+  const status = newAmountPaid >= Number(existing.total_amount) ? 'paid' : 'partial';
+  const paidAt = new Date();
+  const updated = await vendorBillRepository.recordPayment(
+    client,
+    companyId,
+    id,
+    existing.version,
+    { amountPaid: newAmountPaid, utrNumber, status, paidAt },
+    actorId,
+  );
+  if (!updated) throw new AppError('VB_002', [], 'Vendor bill was modified concurrently — retry the payment.');
+
+  if (status === 'paid') {
+    await financeTransactionRepository.create(
+      client,
+      companyId,
+      {
+        branchId: updated.branch_id,
+        transactionDate: paidAt,
+        referenceType: 'vendor_bill_payment',
+        referenceId: updated.id,
+        direction: 'debit',
+        amount: updated.amount_paid,
+        description: `Vendor bill paid — ${updated.invoice_number} (UTR: ${utrNumber})`,
+      },
+      actorId,
+    );
+  }
+
+  return updated;
+}
+
 /** Records a (possibly partial) vendor payment: adds to amount_paid, stamps the
  * UTR/transaction id, and recomputes status ('partial' until amount_paid reaches total_amount).
  * Once the bill is fully 'paid', posts a debit finance_transaction so it flows into the
  * existing ledger automatically (mirrors loan.service.js recordRepayment). */
-async function recordPayment(companyId, id, { amount, utrNumber }, actorId) {
-  const bill = await withTransaction(async (client) => {
-    const existing = await vendorBillRepository.findByIdForUpdate(client, companyId, id);
-    if (!existing) throw new AppError('VB_001');
-
-    const newAmountPaid = Number(existing.amount_paid) + Number(amount);
-    if (newAmountPaid > Number(existing.total_amount)) throw new AppError('VB_002');
-
-    const status = newAmountPaid >= Number(existing.total_amount) ? 'paid' : 'partial';
-    const paidAt = new Date();
-    const updated = await vendorBillRepository.recordPayment(
-      client,
-      companyId,
-      id,
-      existing.version,
-      { amountPaid: newAmountPaid, utrNumber, status, paidAt },
-      actorId,
-    );
-    if (!updated) throw new AppError('VB_002', [], 'Vendor bill was modified concurrently — retry the payment.');
-
-    if (status === 'paid') {
-      await financeTransactionRepository.create(
-        client,
-        companyId,
-        {
-          branchId: updated.branch_id,
-          transactionDate: paidAt,
-          referenceType: 'vendor_bill_payment',
-          referenceId: updated.id,
-          direction: 'debit',
-          amount: updated.amount_paid,
-          description: `Vendor bill paid — ${updated.invoice_number} (UTR: ${utrNumber})`,
-        },
-        actorId,
-      );
-    }
-
-    return updated;
-  });
+async function recordPayment(companyId, id, payload, actorId) {
+  const bill = await withTransaction((client) => recordPaymentWithClient(client, companyId, id, payload, actorId));
 
   if (bill.status === 'paid') {
     await notifyVendorOfPayment(companyId, bill, actorId);
@@ -135,4 +145,4 @@ async function notifyVendorOfPayment(companyId, bill, actorId) {
   }
 }
 
-module.exports = { createFromGrn, getVendorBill, listVendorBills, recordPayment };
+module.exports = { createFromGrn, getVendorBill, listVendorBills, recordPayment, recordPaymentWithClient };

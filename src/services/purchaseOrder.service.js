@@ -102,7 +102,11 @@ async function transitionPurchaseOrder(companyId, id, nextStatus, actorId) {
       if (nextStatus === PURCHASE_ORDER_STATUS.PARTIALLY_RECEIVED) {
         const items = await purchaseOrderRepository.findItems(id);
         for (const item of items) {
-          await stockService.receiveStock(client, companyId, po.warehouse_id, item.product_variant_id, item.quantity);
+          await stockService.receiveStock(client, companyId, po.warehouse_id, item.product_variant_id, item.quantity, {
+            referenceType: 'purchase_order',
+            referenceId: id,
+            actorId,
+          });
         }
       }
 

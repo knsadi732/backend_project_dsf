@@ -76,6 +76,14 @@ async function findById(companyId, id) {
   return rows[0] || null;
 }
 
+async function findByIdForUpdate(client, companyId, id) {
+  const { rows } = await client.query(
+    `SELECT * FROM work_orders WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE FOR UPDATE`,
+    [id, companyId],
+  );
+  return rows[0] || null;
+}
+
 async function list(companyId, pagination, { stage, search } = {}) {
   const { limit, offset } = pagination;
   const conditions = ['wo.company_id = $1', 'wo.is_deleted = FALSE'];
@@ -98,14 +106,17 @@ async function list(companyId, pagination, { stage, search } = {}) {
   return { rows: data.rows, totalRecords: parseInt(count.rows[0].count, 10) };
 }
 
-async function update(companyId, id, fields, updatedBy) {
-  const { rows } = await query(
+async function update(client, companyId, id, fields, updatedBy) {
+  const { rows } = await client.query(
     `UPDATE work_orders
      SET quantity = COALESCE($3, quantity), stage = COALESCE($4, stage), due_date = COALESCE($5, due_date),
          raw_material_cost = COALESCE($6, raw_material_cost), labour_cost = COALESCE($7, labour_cost),
          machine_cost = COALESCE($8, machine_cost), electricity_cost = COALESCE($9, electricity_cost),
          packaging_cost = COALESCE($10, packaging_cost), overhead_cost = COALESCE($11, overhead_cost),
-         remarks = COALESCE($12, remarks), updated_by = $13, updated_at = now()
+         remarks = COALESCE($12, remarks), actual_quantity = COALESCE($13, actual_quantity),
+         completed_at = CASE WHEN $4::varchar = 'completed' THEN now() ELSE completed_at END,
+         floor_stage = CASE WHEN $4::varchar IN ('completed', 'cancelled') THEN NULL ELSE floor_stage END,
+         updated_by = $14, updated_at = now()
      WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE
      RETURNING *`,
     [
@@ -121,8 +132,21 @@ async function update(companyId, id, fields, updatedBy) {
       fields.packagingCost,
       fields.overheadCost,
       fields.remarks,
+      fields.actualQuantity,
       updatedBy,
     ],
+  );
+  return rows[0] || null;
+}
+
+/** Floor-stage advance is its own narrow update — never touches `stage`/costs, only where on the shop floor a batch physically is. */
+async function setFloorStage(companyId, id, floorStage, updatedBy) {
+  const { rows } = await query(
+    `UPDATE work_orders
+     SET floor_stage = $3, updated_by = $4, updated_at = now()
+     WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE AND stage = 'in_progress'
+     RETURNING *`,
+    [id, companyId, floorStage, updatedBy],
   );
   return rows[0] || null;
 }
@@ -164,8 +188,10 @@ async function softDelete(companyId, id, deletedBy) {
 module.exports = {
   create,
   findById,
+  findByIdForUpdate,
   list,
   update,
+  setFloorStage,
   softDelete,
   findOpenReplenishmentByVariant,
   findBySalesOrderAndVariant,

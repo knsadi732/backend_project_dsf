@@ -22,12 +22,23 @@ const vendorQuotationRoutes = require('./vendorQuotation.routes');
 const grnRoutes = require('./grn.routes');
 const vendorBillRoutes = require('./vendorBill.routes');
 const financeRoutes = require('./finance.routes');
+const gstReportRoutes = require('./gstReport.routes');
 const loanRoutes = require('./loan.routes');
 const notificationRoutes = require('./notification.routes');
+const appNotificationRoutes = require('./appNotification.routes');
 const analyticsRoutes = require('./analytics.routes');
 const workOrderRoutes = require('./workOrder.routes');
 const bomRoutes = require('./bom.routes');
 const materialIssueRequestRoutes = require('./materialIssueRequest.routes');
+const machineRoutes = require('./machine.routes');
+const approvalRequestRoutes = require('./approvalRequest.routes');
+const warehouseZoneRoutes = require('./warehouseZone.routes');
+const rackRoutes = require('./rack.routes');
+const shelfRoutes = require('./shelf.routes');
+const binRoutes = require('./bin.routes');
+const inventoryMovementRoutes = require('./inventoryMovement.routes');
+const itemRoutes = require('./item.routes');
+const fixedAssetRoutes = require('./fixedAsset.routes');
 
 const router = Router();
 
@@ -58,12 +69,23 @@ router.use('/vendor-quotations', vendorQuotationRoutes);
 router.use('/grn', grnRoutes);
 router.use('/vendor-bills', vendorBillRoutes);
 router.use('/finance', financeRoutes);
+router.use('/finance/reports', gstReportRoutes);
 router.use('/loans', loanRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/app-notifications', appNotificationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/work-orders', workOrderRoutes);
 router.use('/bom', bomRoutes);
 router.use('/material-issue-requests', materialIssueRequestRoutes);
+router.use('/machines', machineRoutes);
+router.use('/approval-requests', approvalRequestRoutes);
+router.use('/warehouse-zones', warehouseZoneRoutes);
+router.use('/racks', rackRoutes);
+router.use('/shelves', shelfRoutes);
+router.use('/bins', binRoutes);
+router.use('/inventory-movements', inventoryMovementRoutes);
+router.use('/items', itemRoutes); // also exposes /items/categories, /items/stock
+router.use('/fixed-assets', fixedAssetRoutes);
 router.use('/', companyRoutes); // exposes /company, /branches, /warehouses, /settings
 
 module.exports = router;

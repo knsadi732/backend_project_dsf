@@ -123,16 +123,24 @@ async function create(
   return rows[0];
 }
 
-async function update(companyId, id, { fullName, department, jobTitle, roleId, status }, updatedBy) {
+async function update(
+  companyId,
+  id,
+  { fullName, department, jobTitle, roleId, status, branchId, warehouseId, email, phone, passwordHash },
+  updatedBy,
+) {
   const { rows } = await query(
     `UPDATE users
      SET full_name = COALESCE($3, full_name), department = COALESCE($4, department),
          job_title = COALESCE($5, job_title), role_id = COALESCE($6, role_id),
-         status = COALESCE($7, status), updated_by = $8, updated_at = now(), version = version + 1
+         status = COALESCE($7, status), branch_id = COALESCE($8, branch_id),
+         warehouse_id = COALESCE($9, warehouse_id), email = COALESCE($10, email),
+         phone = COALESCE($11, phone), password_hash = COALESCE($12, password_hash),
+         updated_by = $13, updated_at = now(), version = version + 1
      WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE
      RETURNING id, company_id, branch_id, warehouse_id, role_id, employee_id, full_name, email,
                phone, department, job_title, status, created_at, updated_at`,
-    [id, companyId, fullName, department, jobTitle, roleId, status, updatedBy],
+    [id, companyId, fullName, department, jobTitle, roleId, status, branchId, warehouseId, email, phone, passwordHash, updatedBy],
   );
   return rows[0] || null;
 }

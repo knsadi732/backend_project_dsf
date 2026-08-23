@@ -15,6 +15,8 @@ const PERMISSIONS = [
   ['audit.log.view', 'audit', 'View operator action / login / session audit trails.'],
   ['document.manage', 'document', 'Upload, list, and delete documents.'],
   ['product.manage', 'product', 'Manage product catalog, categories, and stock.'],
+  ['warehouse_structure.manage', 'inventory', 'Manage warehouse zones, racks, shelves, and bins (physical storage hierarchy).'],
+  ['inventory_movement.view', 'inventory', 'View the stock movement audit trail (receive/reserve/issue/adjust events).'],
   ['product_variant.manage', 'product', 'Manage product variants (SKU, barcode, size, color, pricing).'],
   ['brand.manage', 'product', 'Manage brand master list.'],
   ['department.manage', 'department', 'Manage department master list.'],
@@ -28,6 +30,11 @@ const PERMISSIONS = [
   ['material_issue_request.view', 'production', 'View raw-material issue requests raised against work orders.'],
   ['material_issue_request.approve', 'production', 'Approve/reject raw-material issue requests (Production Manager).'],
   ['material_issue_request.issue', 'production', 'Mark an approved material issue request as physically issued (warehouse staff) — deducts on-hand stock.'],
+  ['machine.view', 'production', 'View machines and their downtime history.'],
+  ['machine.manage', 'production', 'Create/edit machines, report and resolve downtime.'],
+  ['approval_request.view', 'approval', 'View the one-click approval queue (vendor payments, credit-limit overrides).'],
+  ['approval_request.create', 'approval', 'Raise a vendor-payment or credit-limit-override approval request.'],
+  ['approval_request.approve', 'approval', 'Approve/reject queued approval requests (Owner/Superadmin).'],
   ['purchase_order.manage', 'purchase_order', 'Create purchase orders and drive PO lifecycle transitions.'],
   ['purchase_request.view', 'purchase_request', 'View purchase requests.'],
   ['purchase_request.create', 'purchase_request', 'Raise purchase requests.'],
@@ -51,6 +58,11 @@ const PERMISSIONS = [
   ['finance.ledger.cross_verify', 'finance', 'Cross-verify multi-tenant ledgers.'],
   ['loan.view', 'finance', 'View company loans/debt records (read-only).'],
   ['loan.manage', 'finance', 'Create loans and record repayments/write-offs.'],
+  ['item.manage', 'item', 'Manage Item & Material Master (categories and items — raw material, packaging, consumables, spare parts, tools, fixed assets, services).'],
+  ['item.stock.view', 'item', 'View Item & Material stock levels and movement history.'],
+  ['item.stock.manage', 'item', 'Receive and consume Item & Material stock.'],
+  ['fixed_asset.view', 'fixed_asset', 'View the Fixed Asset Register and maintenance logs.'],
+  ['fixed_asset.manage', 'fixed_asset', 'Register, reassign, maintain, and dispose Fixed Assets.'],
 ];
 
 const ROLES = [
@@ -74,6 +86,13 @@ const ROLE_PERMISSIONS = {
     'finance.bill.print',
     'loan.view',
     'loan.manage',
+    'approval_request.view',
+    'approval_request.create',
+    'item.manage',
+    'item.stock.view',
+    'item.stock.manage',
+    'fixed_asset.view',
+    'fixed_asset.manage',
   ],
   [SYSTEM_ROLES.CA]: [
     'finance.ledger.view',
@@ -83,6 +102,8 @@ const ROLE_PERMISSIONS = {
     'finance.ledger.cross_verify',
     'loan.view',
     'audit.log.view',
+    'item.stock.view',
+    'fixed_asset.view',
   ],
 };
 

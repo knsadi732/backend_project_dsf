@@ -12,6 +12,7 @@ const JOB_SCHEDULE = [
   { name: 'report-generation', pattern: '0 1 * * *' }, // daily 01:00
   { name: 'notification-retry', pattern: '*/15 * * * *' }, // every 15 min
   { name: 'redis-cleanup', pattern: '0 * * * *' }, // hourly
+  { name: 'recurring-charges', pattern: '0 3 * * *' }, // daily 03:00 — posts whatever charge is due that day
 ];
 
 async function registerSchedulerJobs() {

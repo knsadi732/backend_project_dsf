@@ -23,8 +23,8 @@ const reject = asyncHandler(async (req, res) => {
 });
 
 const issue = asyncHandler(async (req, res) => {
-  const mir = await mirService.issue(req.tenant.companyId, req.params.id, req.user.id);
-  return sendSuccess(res, { message: 'Material issue request marked as issued.', data: mir });
+  const mir = await mirService.issue(req.tenant.companyId, req.params.id, req.user.id, req.body.items);
+  return sendSuccess(res, { message: 'Material issue request updated.', data: mir });
 });
 
 module.exports = { list, getOne, approve, reject, issue };

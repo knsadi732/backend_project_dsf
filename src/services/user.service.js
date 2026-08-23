@@ -31,8 +31,9 @@ async function createUser(companyId, payload, actorId) {
 }
 
 async function updateUser(companyId, id, payload, actorId) {
-  const { additionalRoleIds, ...rest } = payload;
-  const user = await userRepository.update(companyId, id, rest, actorId);
+  const { additionalRoleIds, password, ...rest } = payload;
+  const passwordHash = password ? await bcrypt.hash(password, env.auth.saltRounds) : undefined;
+  const user = await userRepository.update(companyId, id, { ...rest, passwordHash }, actorId);
   if (!user) throw new AppError('USER_002');
 
   if (additionalRoleIds !== undefined) {

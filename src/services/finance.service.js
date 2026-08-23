@@ -3,6 +3,7 @@ const { withTransaction } = require('../config/db');
 const { buildPaginationMeta } = require('../utils/pagination');
 const fiscalPeriodRepository = require('../repositories/fiscalPeriod.repository');
 const financeTransactionRepository = require('../repositories/financeTransaction.repository');
+const financeTransactionTaxDetailRepository = require('../repositories/financeTransactionTaxDetail.repository');
 const paymentSlipRepository = require('../repositories/paymentSlip.repository');
 const expenseRepository = require('../repositories/expense.repository');
 const billRepository = require('../repositories/bill.repository');
@@ -10,6 +11,7 @@ const orderRepository = require('../repositories/order.repository');
 const settingsRepository = require('../repositories/settings.repository');
 const companyRepository = require('../repositories/company.repository');
 const statutoryAuditRepository = require('../repositories/statutoryAudit.repository');
+const fundingSourceRepository = require('../repositories/fundingSource.repository');
 
 /** Blocks new postings dated inside a fiscal period the CA has already closed. */
 async function assertPostingDateOpen(companyId, date = new Date()) {
@@ -75,17 +77,73 @@ async function listPaymentSlips(companyId, pagination) {
   return { rows, meta: buildPaginationMeta({ page: pagination.page, limit: pagination.limit, totalRecords }) };
 }
 
-async function recordExpense(companyId, { warehouseId, category, amount, description }, actorId) {
+async function recordExpense(
+  companyId,
+  {
+    warehouseId, category, amount, description, transactionDate,
+    gstApplicable, gstAmount, gstDetail,
+    fundingSourceId, fundingType, utrReference, invoiceNumber, paymentMode, partyName,
+    paidReceivedBy, paidReceivedByName,
+  },
+  actorId,
+) {
   return withTransaction(
     async (client) => {
-      await assertPostingDateOpen(companyId);
-      const expense = await expenseRepository.create(client, companyId, { warehouseId, category, amount, description, recordedBy: actorId }, actorId);
-      await financeTransactionRepository.create(
+      const period = await assertPostingDateOpen(companyId, transactionDate);
+      const expense = await expenseRepository.create(
         client,
         companyId,
-        { referenceType: 'expense', referenceId: expense.id, direction: 'debit', amount, description: category },
+        {
+          warehouseId, category, amount, description, recordedBy: actorId, gstApplicable, gstAmount,
+          fundingSourceId, fundingType, utrReference, invoiceNumber, paymentMode, paidReceivedByName,
+        },
         actorId,
       );
+      const tx = await financeTransactionRepository.create(
+        client,
+        companyId,
+        {
+          transactionDate,
+          fiscalPeriodId: period?.id,
+          referenceType: 'expense',
+          referenceId: expense.id,
+          direction: 'debit',
+          amount,
+          description: description || category,
+          utrReference,
+          invoiceNumber,
+          transactionNature: 'expense',
+          paymentMode,
+          partyName,
+          fundingSourceId,
+          fundingType,
+          paidReceivedBy,
+          paidReceivedByName,
+          category,
+        },
+        actorId,
+      );
+
+      if (gstApplicable) {
+        await financeTransactionTaxDetailRepository.create(
+          client,
+          tx.id,
+          {
+            isGstApplicable: true,
+            taxableValue: gstDetail?.taxableValue ?? Number(amount) - Number(gstAmount || 0),
+            gstRate: gstDetail?.gstRate,
+            cgstAmount: gstDetail?.cgstAmount,
+            sgstAmount: gstDetail?.sgstAmount,
+            igstAmount: gstDetail?.igstAmount,
+            hsnCode: gstDetail?.hsnCode,
+            placeOfSupplyStateCode: gstDetail?.placeOfSupplyStateCode,
+            partyGstin: gstDetail?.partyGstin,
+            partyType: gstDetail?.partyType,
+          },
+          actorId,
+        );
+      }
+
       return expense;
     },
     { isolationLevel: 'REPEATABLE READ' },
@@ -94,6 +152,108 @@ async function recordExpense(companyId, { warehouseId, category, amount, descrip
 
 async function listExpenses(companyId, pagination) {
   const { rows, totalRecords } = await expenseRepository.list(companyId, pagination);
+  return { rows, meta: buildPaginationMeta({ page: pagination.page, limit: pagination.limit, totalRecords }) };
+}
+
+/**
+ * Single spreadsheet-shaped entry point mirroring the owner's manual ledger columns
+ * (Date, UTR, Nature, Credit/Debit, Category, Purpose, Fund Source, Paid/Received By,
+ * Payment Mode, Invoice/Order ID, Party, GST). A thin mapper over the existing GL
+ * posting paths — it must not reimplement ledger logic.
+ *
+ * transactionNature: 'expense' delegates to recordExpense (money out, category-tracked).
+ * 'sale' | 'manual' post directly to finance_transactions: 'sale' is always a credit,
+ * optionally linked to an existing order (referenceType 'order'); anything else is a
+ * free-direction 'manual'-nature row (referenceType 'quick_entry' when untagged).
+ */
+async function quickEntry(companyId, payload, actorId) {
+  if (payload.transactionNature === 'expense') {
+    return recordExpense(
+      companyId,
+      {
+        warehouseId: payload.warehouseId,
+        category: payload.category,
+        amount: payload.amount,
+        description: payload.description,
+        transactionDate: payload.transactionDate,
+        gstApplicable: payload.gst?.applicable,
+        gstAmount: payload.gst?.gstAmount,
+        gstDetail: payload.gst,
+        fundingSourceId: payload.fundingSourceId,
+        fundingType: payload.fundingType,
+        utrReference: payload.utrReference,
+        invoiceNumber: payload.invoiceNumber,
+        paymentMode: payload.paymentMode,
+        partyName: payload.partyName,
+        paidReceivedBy: payload.paidReceivedBy,
+        paidReceivedByName: payload.paidReceivedByName,
+      },
+      actorId,
+    );
+  }
+
+  const direction = payload.transactionNature === 'sale' ? 'credit' : payload.direction;
+  return withTransaction(
+    async (client) => {
+      const period = await assertPostingDateOpen(companyId, payload.transactionDate);
+      const tx = await financeTransactionRepository.create(
+        client,
+        companyId,
+        {
+          branchId: payload.branchId,
+          transactionDate: payload.transactionDate,
+          fiscalPeriodId: period?.id,
+          referenceType: payload.invoiceOrderId ? 'order' : 'quick_entry',
+          referenceId: payload.invoiceOrderId || null,
+          direction,
+          amount: payload.amount,
+          description: payload.description,
+          utrReference: payload.utrReference,
+          invoiceNumber: payload.invoiceNumber,
+          transactionNature: payload.transactionNature,
+          paymentMode: payload.paymentMode,
+          partyName: payload.partyName,
+          fundingSourceId: payload.fundingSourceId,
+          fundingType: payload.fundingType,
+          paidReceivedBy: payload.paidReceivedBy,
+          paidReceivedByName: payload.paidReceivedByName,
+          category: payload.category,
+        },
+        actorId,
+      );
+
+      if (payload.gst?.applicable) {
+        await financeTransactionTaxDetailRepository.create(
+          client,
+          tx.id,
+          {
+            isGstApplicable: true,
+            taxableValue: payload.gst.taxableValue,
+            gstRate: payload.gst.gstRate,
+            cgstAmount: payload.gst.cgstAmount,
+            sgstAmount: payload.gst.sgstAmount,
+            igstAmount: payload.gst.igstAmount,
+            hsnCode: payload.gst.hsnCode,
+            placeOfSupplyStateCode: payload.gst.placeOfSupplyStateCode,
+            partyGstin: payload.gst.partyGstin,
+            partyType: payload.gst.partyType,
+          },
+          actorId,
+        );
+      }
+
+      return tx;
+    },
+    { isolationLevel: 'REPEATABLE READ' },
+  );
+}
+
+async function createFundingSource(companyId, payload, actorId) {
+  return fundingSourceRepository.create(companyId, payload, actorId);
+}
+
+async function listFundingSources(companyId, pagination) {
+  const { rows, totalRecords } = await fundingSourceRepository.list(companyId, pagination);
   return { rows, meta: buildPaginationMeta({ page: pagination.page, limit: pagination.limit, totalRecords }) };
 }
 
@@ -158,7 +318,22 @@ async function getBill(companyId, id) {
   return bill;
 }
 
-/** paidAmount is the total received so far (not just this payment) — balance_due = total_amount - paidAmount, floored at 0. */
+const ORDER_PAYMENT_STATUS_BY_BILL_STATUS = { unpaid: 'pending', partial: 'partial', paid: 'paid' };
+
+/**
+ * paidAmount is the total received so far (not just this payment) —
+ * balance_due = total_amount - paidAmount, floored at 0.
+ *
+ * The bill's status is the source of truth for "has this been paid" —
+ * whatever it resolves to here is mirrored onto the linked Sales Order's
+ * own `payment_status` (unpaid→pending, partial→partial, paid→paid) so the
+ * Sales side reflects Finance's record without a separate manual step.
+ * Bypasses the strict one-step-at-a-time PAYMENT_STATUS_PIPELINE check
+ * order.service.js's own transition endpoint enforces — Finance can
+ * legitimately jump straight from unpaid to paid (a single full payment),
+ * and the order should reflect that immediately rather than being forced
+ * through a fake "partial" step.
+ */
 async function updateBillStatus(companyId, id, { status, paidAmount }, actorId) {
   const bill = await billRepository.findById(companyId, id);
   if (!bill) throw new AppError('COMMON_001');
@@ -168,6 +343,19 @@ async function updateBillStatus(companyId, id, { status, paidAmount }, actorId) 
 
   const updated = await billRepository.updateStatus(companyId, id, { status: resolvedStatus, balanceDue }, actorId);
   if (!updated) throw new AppError('COMMON_001');
+
+  if (bill.order_id) {
+    const targetPaymentStatus = ORDER_PAYMENT_STATUS_BY_BILL_STATUS[resolvedStatus];
+    if (targetPaymentStatus) {
+      await withTransaction(async (client) => {
+        const order = await orderRepository.findByIdForUpdate(client, companyId, bill.order_id);
+        if (order && order.payment_status !== targetPaymentStatus) {
+          await orderRepository.updateStatus(client, bill.order_id, order.version, { paymentStatus: targetPaymentStatus }, actorId);
+        }
+      });
+    }
+  }
+
   return updated;
 }
 
@@ -221,6 +409,9 @@ module.exports = {
   listPaymentSlips,
   recordExpense,
   listExpenses,
+  quickEntry,
+  createFundingSource,
+  listFundingSources,
   createBillForOrder,
   printBill,
   listBills,

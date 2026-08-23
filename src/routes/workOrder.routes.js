@@ -15,5 +15,6 @@ router.post('/', requirePermission('work_order.manage'), validate(v.createWorkOr
 router.get('/:id', requirePermission('work_order.manage'), controller.getOne);
 router.patch('/:id', requirePermission('work_order.manage'), validate(v.updateWorkOrder), controller.update);
 router.delete('/:id', requirePermission('work_order.manage'), controller.remove);
+router.patch('/:id/floor-stage', requirePermission('work_order.manage'), validate(v.advanceFloorStage), controller.advanceFloorStage);
 
 module.exports = router;

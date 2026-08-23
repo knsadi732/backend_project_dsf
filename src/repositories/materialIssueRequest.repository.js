@@ -7,7 +7,8 @@ function generateMirNumber() {
 
 const SELECT_WITH_JOINS = `
   SELECT mir.*, wo.work_order_number, wo.product_id, wo.product_variant_id, p.name AS product_name,
-         w.name AS warehouse_name, ru.full_name AS requested_by_name, au.full_name AS approved_by_name
+         w.name AS warehouse_name, ru.full_name AS requested_by_name, ru.department AS requested_by_department,
+         au.full_name AS approved_by_name
   FROM material_issue_requests mir
   JOIN work_orders wo ON wo.id = mir.work_order_id
   JOIN products p ON p.id = wo.product_id
@@ -38,7 +39,7 @@ async function createItems(client, materialIssueRequestId, items) {
 
 async function findItems(materialIssueRequestId, runner = query) {
   const { rows } = await runner(
-    `SELECT mri.*, pv.sku, pv.size, pv.color, p.name AS raw_material_name
+    `SELECT mri.*, pv.sku, pv.size, pv.color, p.name AS raw_material_name, p.uom
      FROM material_issue_request_items mri
      JOIN product_variants pv ON pv.id = mri.raw_material_variant_id
      JOIN products p ON p.id = pv.product_id
@@ -85,6 +86,7 @@ async function updateStatus(client, id, expectedVersion, { status, approvedBy },
     `UPDATE material_issue_requests
      SET status = $3::varchar, approved_by = COALESCE($4, approved_by),
          approved_at = CASE WHEN $3::varchar = 'approved' THEN now() ELSE approved_at END,
+         issued_at = CASE WHEN $3::varchar = 'issued' THEN now() ELSE issued_at END,
          version = version + 1, updated_by = $5, updated_at = now()
      WHERE id = $1 AND version = $2
      RETURNING *`,
@@ -98,4 +100,9 @@ async function setItemReserved(client, itemId, quantityReserved) {
   await client.query(`UPDATE material_issue_request_items SET quantity_reserved = $2 WHERE id = $1`, [itemId, quantityReserved]);
 }
 
-module.exports = { create, createItems, findItems, findById, findByIdForUpdate, list, updateStatus, setItemReserved };
+/** Records how much was actually issued (deducted from on-hand) for this line — today always equal to quantity_reserved, tracked independently for future partial-issue support. */
+async function setItemIssued(client, itemId, quantityIssued) {
+  await client.query(`UPDATE material_issue_request_items SET quantity_issued = $2 WHERE id = $1`, [itemId, quantityIssued]);
+}
+
+module.exports = { create, createItems, findItems, findById, findByIdForUpdate, list, updateStatus, setItemReserved, setItemIssued };

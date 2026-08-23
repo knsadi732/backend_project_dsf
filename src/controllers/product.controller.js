@@ -70,7 +70,11 @@ const getStockSummary = asyncHandler(async (req, res) => {
 const receiveStock = asyncHandler(async (req, res) => {
   const { warehouseId, productVariantId, quantity } = req.body;
   const stock = await withTransaction((client) =>
-    stockService.receiveStock(client, req.tenant.companyId, warehouseId, productVariantId, quantity),
+    stockService.receiveStock(client, req.tenant.companyId, warehouseId, productVariantId, quantity, {
+      referenceType: 'manual',
+      actorId: req.user.id,
+      movementType: 'stock_adjustment',
+    }),
   );
   return sendSuccess(res, { message: 'Stock received.', data: stock });
 });

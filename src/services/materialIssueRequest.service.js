@@ -4,6 +4,7 @@ const { buildPaginationMeta } = require('../utils/pagination');
 const mirRepository = require('../repositories/materialIssueRequest.repository');
 const bomRepository = require('../repositories/bom.repository');
 const stockRepository = require('../repositories/stock.repository');
+const inventoryMovementRepository = require('../repositories/inventoryMovement.repository');
 const purchaseRequestRepository = require('../repositories/purchaseRequest.repository');
 
 /**
@@ -72,10 +73,28 @@ async function approve(companyId, id, actorId) {
       const reserveQty = Math.min(Number(item.quantity_required), available);
 
       if (reserveQty > 0) {
-        await stockRepository.setQuantities(client, stock.id, {
+        const updatedStock = await stockRepository.setQuantities(client, stock.id, {
           quantityOnHand: stock.quantity_on_hand,
           quantityReserved: Number(stock.quantity_reserved) + reserveQty,
         });
+        await inventoryMovementRepository.record(
+          client,
+          companyId,
+          {
+            warehouseId: mir.warehouse_id,
+            productVariantId: item.raw_material_variant_id,
+            // Not 'sales_reservation' — that name is order-specific in the
+            // fixed movement-type list; this is a raw-material reservation
+            // for production, closest neutral fit is stock_adjustment.
+            movementType: 'stock_adjustment',
+            quantityReservedChange: reserveQty,
+            quantityOnHandAfter: updatedStock.quantity_on_hand,
+            quantityReservedAfter: updatedStock.quantity_reserved,
+            referenceType: 'material_issue_request',
+            referenceId: id,
+          },
+          actorId,
+        );
       }
       await mirRepository.setItemReserved(client, item.id, reserveQty);
 
@@ -125,31 +144,102 @@ async function reject(companyId, id, actorId) {
 /**
  * Manual, explicit "material has physically left the warehouse for
  * production" step — separate from `approve` on purpose (mirrors Orders:
- * confirm reserves, dispatch is the actual deduction). Only ever moves
- * `quantity_reserved` per line (recorded on the item at approval time, not
- * `quantity_required` — the shortfall portion was never reserved) into an
- * on-hand deduction; never issues more than was actually reserved.
+ * confirm reserves, dispatch is the actual deduction).
+ *
+ * Warehouse staff types the exact quantity they're physically handing over
+ * per line (`requestedItems: [{ itemId, quantity }]`) — never auto-computed
+ * — so this only ever moves what someone actually confirmed leaving the
+ * building. Each requested line is capped by two things: the line's
+ * remaining balance (quantity_required - quantity_issued) and what's
+ * actually available (whatever's still earmarked from approval first, then
+ * current on-hand beyond that — stock the shortfall PR's PO may have
+ * delivered since the last call). Exceeding either fails the whole call
+ * with MIR_004 rather than silently capping, so what gets recorded always
+ * matches what was typed.
+ *
+ * Repeatable, not one-shot: production doesn't wait on a full shortfall to
+ * clear before starting — a line can be left out of a given call (e.g. its
+ * stock hasn't arrived yet) and picked up in a later one. Status parks at
+ * "partially_issued" until every line's balance across the whole MIR hits
+ * zero, only then flipping to "issued".
  */
-async function issue(companyId, id, actorId) {
+async function issue(companyId, id, actorId, requestedItems) {
   return withTransaction(async (client) => {
     const mir = await mirRepository.findByIdForUpdate(client, companyId, id);
     if (!mir) throw new AppError('MIR_002');
-    if (mir.status !== 'approved') throw new AppError('MIR_001');
+    if (!['approved', 'partially_issued'].includes(mir.status)) throw new AppError('MIR_001');
 
     const items = await mirRepository.findItems(id, (text, params) => client.query(text, params));
-    for (const item of items) {
-      const reservedQty = Number(item.quantity_reserved);
-      if (reservedQty <= 0) continue;
+    const itemsById = new Map(items.map((item) => [item.id, item]));
+
+    for (const requested of requestedItems) {
+      const item = itemsById.get(requested.itemId);
+      if (!item) throw new AppError('MIR_003');
+
+      const required = Number(item.quantity_required);
+      const alreadyIssued = Number(item.quantity_issued);
+      const balance = required - alreadyIssued;
+      const requestedQty = Number(requested.quantity);
+
+      if (requestedQty > balance) {
+        throw new AppError(
+          'MIR_004',
+          [],
+          `Cannot issue ${requestedQty} of ${item.raw_material_name} — only ${balance} still required (already fully covered otherwise).`,
+        );
+      }
 
       const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, mir.warehouse_id, item.raw_material_variant_id);
-      await stockRepository.setQuantities(client, stock.id, {
-        quantityOnHand: Number(stock.quantity_on_hand) - reservedQty,
-        quantityReserved: Math.max(Number(stock.quantity_reserved) - reservedQty, 0),
-      });
+      let onHand = Number(stock.quantity_on_hand);
+      let reserved = Number(stock.quantity_reserved);
+
+      const stillReserved = Math.max(Number(item.quantity_reserved) - alreadyIssued, 0);
+      const fromReserved = Math.min(stillReserved, requestedQty);
+      const remaining = requestedQty - fromReserved;
+
+      if (remaining > 0) {
+        // Total unreserved stock (onHand - reserved already excludes this
+        // item's own earmarked portion, since `reserved` hasn't had
+        // `fromReserved` subtracted out yet at this point).
+        const available = Math.max(onHand - reserved, 0);
+        if (remaining > available) {
+          throw new AppError(
+            'MIR_004',
+            [],
+            `Cannot issue ${requestedQty} of ${item.raw_material_name} — only ${fromReserved + available} currently available in stock.`,
+          );
+        }
+      }
+
+      onHand -= requestedQty;
+      reserved = Math.max(reserved - fromReserved, 0);
+
+      const updatedStock = await stockRepository.setQuantities(client, stock.id, { quantityOnHand: onHand, quantityReserved: reserved });
+      await inventoryMovementRepository.record(
+        client,
+        companyId,
+        {
+          warehouseId: mir.warehouse_id,
+          productVariantId: item.raw_material_variant_id,
+          movementType: 'stock_adjustment',
+          quantityChange: -requestedQty,
+          quantityReservedChange: -fromReserved,
+          quantityOnHandAfter: updatedStock.quantity_on_hand,
+          quantityReservedAfter: updatedStock.quantity_reserved,
+          referenceType: 'material_issue_request',
+          referenceId: id,
+          remarks: 'Raw material issued to production',
+        },
+        actorId,
+      );
+      await mirRepository.setItemIssued(client, item.id, alreadyIssued + requestedQty);
+      itemsById.set(item.id, { ...item, quantity_issued: alreadyIssued + requestedQty });
     }
 
-    const updated = await mirRepository.updateStatus(client, id, mir.version, { status: 'issued' }, actorId);
-    if (!updated) throw new AppError('MIR_001', [], 'Material issue request was modified concurrently — retry marking it issued.');
+    const allBalanced = [...itemsById.values()].every((item) => Number(item.quantity_required) - Number(item.quantity_issued) <= 0);
+    const nextStatus = allBalanced ? 'issued' : 'partially_issued';
+    const updated = await mirRepository.updateStatus(client, id, mir.version, { status: nextStatus }, actorId);
+    if (!updated) throw new AppError('MIR_001', [], 'Material issue request was modified concurrently — retry.');
     return updated;
   });
 }
