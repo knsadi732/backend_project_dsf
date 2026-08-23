@@ -85,19 +85,34 @@ async function getInwardSummary(companyId, period) {
   return rows;
 }
 
-/** Category-wise credit/debit totals for the P&L report. */
+/**
+ * Category-wise credit/debit totals for the P&L report. GST-applicable rows are
+ * netted down to their taxable value — the GST portion is recoverable as ITC (for
+ * purchases) or collected on behalf of the government (for sales), so it is never
+ * part of real business income/expense and must not inflate Total Sales/Expenses.
+ */
 async function getCategoryTotals(companyId, period) {
   const params = [companyId];
-  const conditions = ['company_id = $1', 'is_deleted = FALSE'];
-  conditions.push(...dateConditions('', period, params));
+  const conditions = ['tx.company_id = $1', 'tx.is_deleted = FALSE'];
+  conditions.push(...dateConditions('tx.', period, params));
 
   const { rows } = await query(
-    `SELECT COALESCE(category, 'uncategorized') AS category, direction,
-            COALESCE(SUM(amount), 0) AS total
-     FROM finance_transactions
-     WHERE ${conditions.join(' AND ')}
-     GROUP BY category, direction
-     ORDER BY category`,
+    `SELECT COALESCE(tx.category, 'uncategorized') AS category, tx.direction,
+            COALESCE(SUM(
+              -- Only net down when a real taxable_value has actually been entered —
+              -- rows still pending invoice details (taxable_value = 0) fall back to
+              -- the full amount rather than silently understating the expense to ₹0.
+              CASE WHEN td.is_gst_applicable AND td.taxable_value > 0 THEN td.taxable_value ELSE tx.amount END
+            ), 0) AS total
+     FROM finance_transactions tx
+     LEFT JOIN finance_transaction_tax_details td ON td.finance_transaction_id = tx.id AND td.is_deleted = FALSE
+     -- Capital expenditure (a purchase that became a Fixed Asset) is excluded here —
+     -- its full cost is not a period expense, only its depreciation is (added
+     -- separately by gstReport.service.js#getProfitAndLoss as a 'Depreciation' line).
+     LEFT JOIN fixed_assets fa ON fa.finance_transaction_id = tx.id AND fa.is_deleted = FALSE
+     WHERE fa.id IS NULL AND ${conditions.join(' AND ')}
+     GROUP BY tx.category, tx.direction
+     ORDER BY tx.category`,
     params,
   );
   return rows;

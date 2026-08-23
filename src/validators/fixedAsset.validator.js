@@ -23,6 +23,7 @@ const registerAsset = Joi.object({
   branchId: Joi.string().guid().allow(null),
   warehouseId: Joi.string().guid().allow(null),
   custodianUserId: Joi.string().guid().allow(null),
+  custodianName: Joi.string().max(255).allow(null, ''),
   locationNote: Joi.string().max(255).allow(null, ''),
   depreciationMethod: Joi.string().valid('straight_line', 'written_down_value'),
   usefulLifeYears: Joi.number().min(0),
@@ -37,12 +38,14 @@ const registerAsset = Joi.object({
   gstApplicable: Joi.boolean(),
   gstAmount: Joi.number().min(0),
   gstDetail,
+  existingFinanceTransactionId: Joi.string().guid().allow(null),
 });
 
 const reassignAsset = Joi.object({
   branchId: Joi.string().guid().allow(null),
   warehouseId: Joi.string().guid().allow(null),
   custodianUserId: Joi.string().guid().allow(null),
+  custodianName: Joi.string().max(255).allow(null, ''),
   locationNote: Joi.string().max(255).allow(null, ''),
   remarks: Joi.string().allow(null, ''),
 });

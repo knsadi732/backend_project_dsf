@@ -48,34 +48,42 @@ async function registerAsset(
   companyId,
   {
     itemId, vendorId, assetName, serialNumber, purchaseDate, purchaseCost, warrantyExpiry,
-    branchId, warehouseId, custodianUserId, locationNote,
+    branchId, warehouseId, custodianUserId, custodianName, locationNote,
     depreciationMethod, usefulLifeYears, salvageValue, remarks,
     transactionDate, gstApplicable, gstAmount, gstDetail, fundingSourceId, fundingType, utrReference, paymentMode, partyName,
+    existingFinanceTransactionId,
   },
   actorId,
 ) {
   const item = await itemRepository.findById(companyId, itemId);
   if (!item) throw new AppError('COMMON_001');
 
-  const expense = await financeService.recordExpense(
-    companyId,
-    {
-      warehouseId,
-      category: item.item_category_name || 'Fixed Asset Purchase',
-      amount: purchaseCost,
-      description: `Fixed asset purchase: ${assetName}`,
-      transactionDate: transactionDate || purchaseDate,
-      partyName,
-      utrReference,
-      paymentMode,
-      fundingSourceId,
-      fundingType,
-      gstApplicable,
-      gstAmount,
-      gstDetail,
-    },
-    actorId,
-  );
+  // existingFinanceTransactionId lets a Fixed Asset be registered against a purchase
+  // already recorded in the ledger (e.g. via Quick Entry before this domain existed) —
+  // posting a second expense here would double-count the same cash outflow in P&L.
+  let expense = null;
+  let financeTransactionId = existingFinanceTransactionId || null;
+  if (!existingFinanceTransactionId) {
+    expense = await financeService.recordExpense(
+      companyId,
+      {
+        warehouseId,
+        category: item.item_category_name || 'Fixed Asset Purchase',
+        amount: purchaseCost,
+        description: `Fixed asset purchase: ${assetName}`,
+        transactionDate: transactionDate || purchaseDate,
+        partyName,
+        utrReference,
+        paymentMode,
+        fundingSourceId,
+        fundingType,
+        gstApplicable,
+        gstAmount,
+        gstDetail,
+      },
+      actorId,
+    );
+  }
 
   const asset = await withTransaction((client) =>
     fixedAssetRepository.create(
@@ -89,9 +97,11 @@ async function registerAsset(
         purchaseDate,
         purchaseCost,
         warrantyExpiry,
+        financeTransactionId,
         branchId,
         warehouseId,
         custodianUserId,
+        custodianName,
         locationNote,
         depreciationMethod,
         usefulLifeYears,
@@ -102,11 +112,11 @@ async function registerAsset(
     ),
   );
 
-  if (custodianUserId || branchId || warehouseId) {
+  if (custodianUserId || custodianName || branchId || warehouseId) {
     await withTransaction((client) =>
       fixedAssetAssignmentRepository.create(
         client,
-        { assetId: asset.id, branchId, warehouseId, custodianUserId, locationNote, remarks: 'Initial assignment on registration' },
+        { assetId: asset.id, branchId, warehouseId, custodianUserId, custodianName, locationNote, remarks: 'Initial assignment on registration' },
         actorId,
       ),
     );
@@ -128,7 +138,7 @@ async function getAsset(companyId, id) {
 }
 
 /** Reassigning Location/Custodian is preserved as history (Chapter 13 §13.7), never overwritten in place. */
-async function reassignAsset(companyId, id, { branchId, warehouseId, custodianUserId, locationNote, remarks }, actorId) {
+async function reassignAsset(companyId, id, { branchId, warehouseId, custodianUserId, custodianName, locationNote, remarks }, actorId) {
   return withTransaction(async (client) => {
     const asset = await fixedAssetRepository.findByIdForUpdate(client, companyId, id);
     if (!asset) throw new AppError('COMMON_001');
@@ -137,12 +147,12 @@ async function reassignAsset(companyId, id, { branchId, warehouseId, custodianUs
       client,
       id,
       asset.version,
-      { branchId, warehouseId, custodianUserId, locationNote },
+      { branchId, warehouseId, custodianUserId, custodianName, locationNote },
       actorId,
     );
     await fixedAssetAssignmentRepository.create(
       client,
-      { assetId: id, branchId, warehouseId, custodianUserId, locationNote, remarks },
+      { assetId: id, branchId, warehouseId, custodianUserId, custodianName, locationNote, remarks },
       actorId,
     );
     return withComputedValue(updated);

@@ -3,7 +3,7 @@ const { buildListQuery } = require('../utils/queryBuilder');
 
 const SELECT_WITH_JOINS = `
   SELECT fa.*, i.item_name, i.item_code, v.name AS vendor_name,
-         u.full_name AS custodian_name, b.name AS branch_name, w.name AS warehouse_name
+         COALESCE(fa.custodian_name, u.full_name) AS custodian_name, b.name AS branch_name, w.name AS warehouse_name
   FROM fixed_assets fa
   LEFT JOIN items i ON i.id = fa.item_id
   LEFT JOIN vendors v ON v.id = fa.vendor_id
@@ -22,7 +22,7 @@ async function create(
   companyId,
   {
     itemId, vendorId, assetTag, assetName, serialNumber, purchaseDate, purchaseCost, warrantyExpiry,
-    financeTransactionId, branchId, warehouseId, custodianUserId, locationNote,
+    financeTransactionId, branchId, warehouseId, custodianUserId, custodianName, locationNote,
     depreciationMethod, usefulLifeYears, salvageValue, remarks,
   },
   createdBy,
@@ -31,10 +31,10 @@ async function create(
   const { rows } = await client.query(
     `INSERT INTO fixed_assets (
        company_id, item_id, vendor_id, asset_tag, asset_name, serial_number, purchase_date, purchase_cost,
-       warranty_expiry, finance_transaction_id, branch_id, warehouse_id, custodian_user_id, location_note,
-       depreciation_method, useful_life_years, salvage_value, remarks, created_by, updated_by
+       warranty_expiry, finance_transaction_id, branch_id, warehouse_id, custodian_user_id, custodian_name,
+       location_note, depreciation_method, useful_life_years, salvage_value, remarks, created_by, updated_by
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $19)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $20)
      RETURNING *`,
     [
       companyId,
@@ -50,6 +50,7 @@ async function create(
       branchId || null,
       warehouseId || null,
       custodianUserId || null,
+      custodianName || null,
       locationNote || null,
       depreciationMethod || 'straight_line',
       usefulLifeYears || 0,
@@ -106,14 +107,14 @@ async function list(companyId, pagination, { status, itemCategoryId } = {}) {
   return { rows: data.rows, totalRecords: parseInt(count.rows[0].count, 10) };
 }
 
-async function reassign(client, id, expectedVersion, { branchId, warehouseId, custodianUserId, locationNote }, updatedBy) {
+async function reassign(client, id, expectedVersion, { branchId, warehouseId, custodianUserId, custodianName, locationNote }, updatedBy) {
   const { rows } = await client.query(
     `UPDATE fixed_assets
-     SET branch_id = $3, warehouse_id = $4, custodian_user_id = $5, location_note = $6,
-         version = version + 1, updated_by = $7, updated_at = now()
+     SET branch_id = $3, warehouse_id = $4, custodian_user_id = $5, custodian_name = $6, location_note = $7,
+         version = version + 1, updated_by = $8, updated_at = now()
      WHERE id = $1 AND version = $2
      RETURNING *`,
-    [id, expectedVersion, branchId || null, warehouseId || null, custodianUserId || null, locationNote || null, updatedBy],
+    [id, expectedVersion, branchId || null, warehouseId || null, custodianUserId || null, custodianName || null, locationNote || null, updatedBy],
   );
   return rows[0] || null;
 }

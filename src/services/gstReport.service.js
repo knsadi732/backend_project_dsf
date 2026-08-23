@@ -1,4 +1,6 @@
 const gstReportRepository = require('../repositories/gstReport.repository');
+const fixedAssetService = require('./fixedAsset.service');
+const { estimateIncomeTax } = require('../utils/incomeTax');
 
 /**
  * GSTR-1: outward supplies. HSN/rate-wise summary plus a B2B invoice-wise
@@ -68,7 +70,52 @@ async function getProfitAndLoss(companyId, period = {}) {
     else totalExpenses += amount;
   }
 
-  return { period, categories, totalSales, totalExpenses, netProfit: totalSales - totalExpenses };
+  // Fixed Asset purchases are capitalized, not expensed (excluded from `rows` above by
+  // getCategoryTotals) — only their depreciation-to-date is a real period expense.
+  // Their remaining value belongs on a Balance Sheet, not the P&L — surfaced here as
+  // fixedAssetsSummary so "what does the company own" is still answerable from this report.
+  const { rows: assets } = await fixedAssetService.listAssets(companyId, { page: 1, limit: 1000, offset: 0, search: '' }, {});
+  const activeAssets = assets.filter((asset) => asset.status !== 'disposed');
+  const depreciation = activeAssets.reduce((total, asset) => total + Number(asset.accumulated_depreciation || 0), 0);
+  if (depreciation > 0) {
+    categories.Depreciation = { credit: 0, debit: depreciation };
+    totalExpenses += depreciation;
+  }
+
+  const fixedAssetsSummary = {
+    totalCost: activeAssets.reduce((total, asset) => total + Number(asset.purchase_cost || 0), 0),
+    totalAccumulatedDepreciation: depreciation,
+    netBookValue: activeAssets.reduce((total, asset) => total + Number(asset.net_book_value || 0), 0),
+    assets: activeAssets.map((asset) => ({
+      assetTag: asset.asset_tag,
+      assetName: asset.asset_name,
+      purchaseCost: Number(asset.purchase_cost),
+      accumulatedDepreciation: Number(asset.accumulated_depreciation),
+      netBookValue: Number(asset.net_book_value),
+    })),
+  };
+
+  const netProfit = totalSales - totalExpenses;
+  const newRegime = estimateIncomeTax(netProfit, 'new');
+  const oldRegime = estimateIncomeTax(netProfit, 'old');
+  const recommendedRegime = newRegime.totalTax <= oldRegime.totalTax ? 'new' : 'old';
+
+  return {
+    period,
+    categories,
+    totalSales,
+    totalExpenses,
+    netProfit,
+    fixedAssetsSummary,
+    estimatedIncomeTax: {
+      newRegime,
+      oldRegime,
+      recommendedRegime,
+      disclaimer:
+        'Estimated from this business\'s Net Profit only, using FY 2026-27 individual slab rates (Section 87A rebate + 4% cess applied, surcharge not modeled). ' +
+        'Does not account for the proprietor\'s other income, deductions (80C etc., old regime only), or advance tax already paid — confirm with your CA before filing.',
+    },
+  };
 }
 
 module.exports = { getGstr1Summary, getGstr3bSummary, getGstr2bProxy, getProfitAndLoss };
