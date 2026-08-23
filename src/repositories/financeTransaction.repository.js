@@ -4,9 +4,9 @@ async function create(client, companyId, fields, createdBy) {
   const { rows } = await client.query(
     `INSERT INTO finance_transactions (company_id, branch_id, fiscal_period_id, transaction_date, reference_type,
                                         reference_id, direction, amount, description, utr_reference, invoice_number,
-                                        transaction_nature, payment_mode, party_name, funding_source_id,
+                                        order_id, transaction_nature, payment_mode, party_name, funding_source_id,
                                         funding_type, paid_received_by, paid_received_by_name, category, created_by, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $20)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $21)
      RETURNING *`,
     [
       companyId,
@@ -20,6 +20,7 @@ async function create(client, companyId, fields, createdBy) {
       fields.description || null,
       fields.utrReference || null,
       fields.invoiceNumber || null,
+      fields.orderId || null,
       fields.transactionNature || null,
       fields.paymentMode || null,
       fields.partyName || null,
@@ -58,7 +59,7 @@ async function list(companyId, pagination, { referenceType } = {}) {
   const dataSql = `
     SELECT ft.id AS transaction_id, ft.transaction_date AS date, ft.reference_type AS type, ft.reference_id,
            ft.transaction_nature, ft.description, ft.category, ft.party_name, ft.utr_reference, ft.invoice_number,
-           ft.payment_mode,
+           ft.order_id, ft.payment_mode,
            -- reference_id only means "order id" when reference_type = 'order'
            -- (it's also an expense/purchase_order/quick_entry id otherwise) —
            -- the join is naturally a no-op (NULL order_number) for those rows.

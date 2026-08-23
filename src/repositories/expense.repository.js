@@ -6,15 +6,15 @@ async function create(
   companyId,
   {
     warehouseId, category, amount, description, recordedBy, gstApplicable, gstAmount,
-    fundingSourceId, fundingType, utrReference, invoiceNumber, paymentMode, paidReceivedByName,
+    fundingSourceId, fundingType, utrReference, invoiceNumber, orderId, paymentMode, paidReceivedByName,
   },
   createdBy,
 ) {
   const { rows } = await client.query(
     `INSERT INTO expenses (company_id, warehouse_id, category, amount, description, recorded_by, gst_applicable,
-                            gst_amount, funding_source_id, funding_type, utr_reference, invoice_number, payment_mode,
-                            paid_received_by_name, created_by, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15)
+                            gst_amount, funding_source_id, funding_type, utr_reference, invoice_number, order_id,
+                            payment_mode, paid_received_by_name, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16)
      RETURNING *`,
     [
       companyId,
@@ -29,6 +29,7 @@ async function create(
       fundingType || null,
       utrReference || null,
       invoiceNumber || null,
+      orderId || null,
       paymentMode || null,
       paidReceivedByName || null,
       createdBy,

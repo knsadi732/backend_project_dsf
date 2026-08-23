@@ -82,7 +82,7 @@ async function recordExpense(
   {
     warehouseId, category, amount, description, transactionDate,
     gstApplicable, gstAmount, gstDetail,
-    fundingSourceId, fundingType, utrReference, invoiceNumber, paymentMode, partyName,
+    fundingSourceId, fundingType, utrReference, invoiceNumber, orderId, paymentMode, partyName,
     paidReceivedBy, paidReceivedByName,
   },
   actorId,
@@ -95,7 +95,7 @@ async function recordExpense(
         companyId,
         {
           warehouseId, category, amount, description, recordedBy: actorId, gstApplicable, gstAmount,
-          fundingSourceId, fundingType, utrReference, invoiceNumber, paymentMode, paidReceivedByName,
+          fundingSourceId, fundingType, utrReference, invoiceNumber, orderId, paymentMode, paidReceivedByName,
         },
         actorId,
       );
@@ -112,6 +112,7 @@ async function recordExpense(
           description: description || category,
           utrReference,
           invoiceNumber,
+          orderId,
           transactionNature: 'expense',
           paymentMode,
           partyName,
@@ -183,6 +184,7 @@ async function quickEntry(companyId, payload, actorId) {
         fundingType: payload.fundingType,
         utrReference: payload.utrReference,
         invoiceNumber: payload.invoiceNumber,
+        orderId: payload.orderId,
         paymentMode: payload.paymentMode,
         partyName: payload.partyName,
         paidReceivedBy: payload.paidReceivedBy,
@@ -210,6 +212,7 @@ async function quickEntry(companyId, payload, actorId) {
           description: payload.description,
           utrReference: payload.utrReference,
           invoiceNumber: payload.invoiceNumber,
+          orderId: payload.orderId,
           transactionNature: payload.transactionNature,
           paymentMode: payload.paymentMode,
           partyName: payload.partyName,
