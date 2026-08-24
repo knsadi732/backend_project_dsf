@@ -50,6 +50,9 @@ const ERROR_CODES = {
   LOAN_001: { httpStatus: 404, message: 'Loan not found.' },
   LOAN_002: { httpStatus: 400, message: 'Loan is not active; repayments/write-off are not permitted.' },
 
+  PAYABLE_001: { httpStatus: 404, message: 'Payable not found.' },
+  PAYABLE_002: { httpStatus: 400, message: 'Payable is not open; payments/write-off are not permitted.' },
+
   DOC_001: { httpStatus: 404, message: 'Document not found.' },
 
   MIR_001: { httpStatus: 400, message: 'Attempted material issue request state transition violates defined state engine flow rules.' },
