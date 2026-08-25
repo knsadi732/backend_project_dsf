@@ -10,6 +10,7 @@ const v = require('../validators/workOrder.validator');
 const router = Router();
 router.use(authenticate, tenantContext);
 
+router.get('/overhead-per-unit', requirePermission('work_order.manage'), controller.overheadPerUnit);
 router.get('/', requirePermission('work_order.manage'), paginate, controller.list);
 router.post('/', requirePermission('work_order.manage'), validate(v.createWorkOrder), controller.create);
 router.get('/:id', requirePermission('work_order.manage'), controller.getOne);

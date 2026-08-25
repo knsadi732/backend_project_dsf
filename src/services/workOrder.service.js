@@ -8,6 +8,7 @@ const workOrderRepository = require('../repositories/workOrder.repository');
 // into this one.
 const materialIssueRequestService = require('./materialIssueRequest.service');
 const stockRepository = require('../repositories/stock.repository');
+const productVariantRepository = require('../repositories/productVariant.repository');
 const { FLOOR_STAGES } = require('../validators/workOrder.validator');
 const { reallocateOverheadForMonth, monthStartOf } = require('./overheadAllocation.service');
 
@@ -58,6 +59,30 @@ async function updateWorkOrder(companyId, id, payload, actorId) {
     if (!workOrder) throw new AppError('COMMON_001');
 
     const enteringCompleted = enteringCompletedNow;
+
+    // Piece-rate manufacturing labour + per-unit packaging material cost —
+    // both design-specific rates on the variant, auto-applied the moment
+    // production finishes (rate × actual_quantity), same trigger point as
+    // the overhead reallocation below. Only fills in what the caller didn't
+    // already type manually, and only when the WO is tied to a variant that
+    // has a rate configured.
+    if (enteringCompleted && workOrder.product_variant_id) {
+      const variant = await productVariantRepository.findById(companyId, workOrder.product_variant_id);
+      const actualQty = Number(workOrder.actual_quantity ?? workOrder.quantity);
+      const autoCosts = {};
+      if (payload.labourCost == null && variant && Number(variant.manufacturing_rate_per_unit) > 0) {
+        autoCosts.labour_cost = (Number(variant.manufacturing_rate_per_unit) * actualQty).toFixed(2);
+      }
+      if (payload.packagingCost == null && variant && Number(variant.packaging_material_cost_per_unit) > 0) {
+        autoCosts.packaging_cost = (Number(variant.packaging_material_cost_per_unit) * actualQty).toFixed(2);
+      }
+      if (Object.keys(autoCosts).length > 0) {
+        const sets = Object.keys(autoCosts).map((col, idx) => `${col} = $${idx + 2}`);
+        await client.query(`UPDATE work_orders SET ${sets.join(', ')} WHERE id = $1`, [id, ...Object.values(autoCosts)]);
+        Object.assign(workOrder, autoCosts);
+      }
+    }
+
     if (enteringCompleted && workOrder.product_variant_id && workOrder.warehouse_id) {
       const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, workOrder.warehouse_id, workOrder.product_variant_id);
       await stockRepository.setQuantities(client, stock.id, {

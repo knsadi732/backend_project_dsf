@@ -53,6 +53,12 @@ const ERROR_CODES = {
   PAYABLE_001: { httpStatus: 404, message: 'Payable not found.' },
   PAYABLE_002: { httpStatus: 400, message: 'Payable is not open; payments/write-off are not permitted.' },
 
+  RETURN_001: { httpStatus: 404, message: 'Return not found.' },
+  RETURN_002: { httpStatus: 400, message: 'A warehouse is required for this action.' },
+
+  CHANNEL_001: { httpStatus: 404, message: 'Marketplace channel not found.' },
+  SETTLEMENT_001: { httpStatus: 404, message: 'Marketplace settlement not found.' },
+
   DOC_001: { httpStatus: 404, message: 'Document not found.' },
 
   MIR_001: { httpStatus: 400, message: 'Attempted material issue request state transition violates defined state engine flow rules.' },

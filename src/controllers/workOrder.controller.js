@@ -1,6 +1,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const { sendSuccess } = require('../utils/response');
 const workOrderService = require('../services/workOrder.service');
+const { getOverheadPerUnitForMonth } = require('../services/overheadAllocation.service');
 
 const create = asyncHandler(async (req, res) => {
   const workOrder = await workOrderService.createWorkOrder(req.tenant.companyId, req.body, req.user.id);
@@ -32,4 +33,9 @@ const advanceFloorStage = asyncHandler(async (req, res) => {
   return sendSuccess(res, { message: 'Floor stage advanced.', data: workOrder });
 });
 
-module.exports = { create, list, getOne, update, remove, advanceFloorStage };
+const overheadPerUnit = asyncHandler(async (req, res) => {
+  const data = await getOverheadPerUnitForMonth(req.tenant.companyId);
+  return sendSuccess(res, { message: 'Current month overhead per unit.', data });
+});
+
+module.exports = { create, list, getOne, update, remove, advanceFloorStage, overheadPerUnit };

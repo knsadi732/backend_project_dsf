@@ -13,6 +13,8 @@ const createVariant = Joi.object({
   wholesalePrice: Joi.number().min(0).allow(null),
   dealerPrice: Joi.number().min(0).allow(null),
   costPrice: Joi.number().min(0),
+  manufacturingRatePerUnit: Joi.number().min(0),
+  packagingMaterialCostPerUnit: Joi.number().min(0),
 });
 
 const updateVariant = Joi.object({
@@ -26,6 +28,8 @@ const updateVariant = Joi.object({
   wholesalePrice: Joi.number().min(0).allow(null),
   dealerPrice: Joi.number().min(0).allow(null),
   costPrice: Joi.number().min(0),
+  manufacturingRatePerUnit: Joi.number().min(0),
+  packagingMaterialCostPerUnit: Joi.number().min(0),
   status: Joi.string().valid('active', 'inactive', 'discontinued'),
 });
 

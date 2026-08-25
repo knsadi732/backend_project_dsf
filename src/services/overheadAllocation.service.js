@@ -53,6 +53,37 @@ async function reallocateOverheadForMonth(client, companyId, monthStart) {
   return { totalOverhead, totalProduction, overheadPerUnit, workOrdersUpdated: productionResult.rows.length };
 }
 
+/**
+ * Read-only counterpart to reallocateOverheadForMonth — same ratio, no writes.
+ * Powers the Pricing Calculator's "current overhead/pair" input without
+ * touching any work_orders row.
+ */
+async function getOverheadPerUnitForMonth(companyId, monthStart = monthStartOf(new Date())) {
+  const monthEnd = new Date(monthStart);
+  monthEnd.setMonth(monthEnd.getMonth() + 1);
+
+  const overheadResult = await query(
+    `SELECT COALESCE(SUM(amount), 0) AS total
+     FROM finance_transactions
+     WHERE company_id = $1 AND is_deleted = FALSE
+       AND reference_type IN ('loan_interest', 'recurring_charge')
+       AND transaction_date >= $2 AND transaction_date < $3`,
+    [companyId, monthStart, monthEnd],
+  );
+  const totalOverhead = Number(overheadResult.rows[0].total);
+
+  const productionResult = await query(
+    `SELECT COALESCE(SUM(quantity), 0) AS total
+     FROM work_orders
+     WHERE company_id = $1 AND is_deleted = FALSE AND stage = 'completed'
+       AND updated_at >= $2 AND updated_at < $3`,
+    [companyId, monthStart, monthEnd],
+  );
+  const totalProduction = Number(productionResult.rows[0].total);
+
+  return { totalOverhead, totalProduction, overheadPerUnit: totalProduction > 0 ? totalOverhead / totalProduction : 0 };
+}
+
 /** Runs the reallocation for every company that has at least one completed work order or posted overhead charge this month. */
 async function reallocateOverheadForAllCompanies(monthStart) {
   const { rows } = await query(`SELECT id FROM companies WHERE is_deleted = FALSE`);
@@ -64,4 +95,4 @@ async function reallocateOverheadForAllCompanies(monthStart) {
   return results;
 }
 
-module.exports = { reallocateOverheadForMonth, reallocateOverheadForAllCompanies, monthStartOf };
+module.exports = { reallocateOverheadForMonth, reallocateOverheadForAllCompanies, getOverheadPerUnitForMonth, monthStartOf };

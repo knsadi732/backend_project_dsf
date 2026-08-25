@@ -16,6 +16,18 @@ async function getGstr1Summary(companyId, period = {}) {
   return { period, hsnRateSummary, b2bSummary, b2cSummary, b2bInvoices };
 }
 
+/**
+ * A purchase only earns Input Tax Credit when the supplier's invoice actually
+ * carries this business's own GSTIN as the buyer (a genuine B2B invoice) —
+ * a B2C purchase (billed to an individual, no buyer GSTIN captured) pays the
+ * same GST but that tax is not recoverable, it's just part of the cost.
+ * `party_gstin` alone isn't proof either — it may just be the seller's own
+ * GSTIN carried on the row — so both signals are required together.
+ */
+function isItcEligible(row) {
+  return row.party_type === 'b2b' && Boolean(row.party_gstin);
+}
+
 /** GSTR-3B: consolidated summary — outward tax liability minus eligible ITC. */
 async function getGstr3bSummary(companyId, period = {}) {
   const [outward, inward] = await Promise.all([
@@ -26,13 +38,16 @@ async function getGstr3bSummary(companyId, period = {}) {
   const sumField = (rows, field) => rows.reduce((total, row) => total + Number(row[field]), 0);
   const outwardTaxableValue = sumField(outward, 'taxable_value');
   const outputTax = sumField(outward, 'cgst_amount') + sumField(outward, 'sgst_amount') + sumField(outward, 'igst_amount');
-  const itcClaimed = inward.reduce((total, row) => total + Number(row.cgst_amount) + Number(row.sgst_amount) + Number(row.igst_amount), 0);
+  const eligibleInward = inward.filter(isItcEligible);
+  const itcClaimed = eligibleInward.reduce((total, row) => total + Number(row.cgst_amount) + Number(row.sgst_amount) + Number(row.igst_amount), 0);
+  const itcIneligible = inward.filter((row) => !isItcEligible(row)).reduce((total, row) => total + Number(row.cgst_amount) + Number(row.sgst_amount) + Number(row.igst_amount), 0);
 
   return {
     period,
     outwardTaxableValue,
     outputTax,
     itcClaimed,
+    itcIneligible,
     netTaxPayable: Math.max(outputTax - itcClaimed, 0),
   };
 }
@@ -48,7 +63,7 @@ async function getGstr2bProxy(companyId, period = {}) {
   const rows = await gstReportRepository.getInwardSummary(companyId, period);
   return {
     period,
-    rows,
+    rows: rows.map((row) => ({ ...row, itcEligible: isItcEligible(row) })),
     disclaimer:
       'This is an internal proxy built from purchase/expense entries recorded in this system, ' +
       'not the GSTN-reconciled GSTR-2B. Cross-check against the portal-downloaded GSTR-2B before filing.',

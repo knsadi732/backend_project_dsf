@@ -74,7 +74,7 @@ async function getInwardSummary(companyId, period) {
   conditions.push(...dateConditions('tx.', period, params));
 
   const { rows } = await query(
-    `SELECT tx.id AS transaction_id, tx.transaction_date, tx.party_name, td.party_gstin, td.hsn_code,
+    `SELECT tx.id AS transaction_id, tx.transaction_date, tx.party_name, td.party_gstin, td.party_type, td.hsn_code,
             td.gst_rate, td.taxable_value, td.cgst_amount, td.sgst_amount, td.igst_amount
      FROM finance_transactions tx
      JOIN finance_transaction_tax_details td ON td.finance_transaction_id = tx.id AND td.is_deleted = FALSE

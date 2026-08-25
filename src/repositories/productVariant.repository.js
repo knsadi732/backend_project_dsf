@@ -60,16 +60,20 @@ async function findById(companyId, id) {
 
 async function create(
   companyId,
-  { productId, variantGroupId, sku, barcode, size, color, weight, mrp, sellingPrice, wholesalePrice, dealerPrice, costPrice },
+  {
+    productId, variantGroupId, sku, barcode, size, color, weight, mrp, sellingPrice, wholesalePrice, dealerPrice,
+    costPrice, manufacturingRatePerUnit, packagingMaterialCostPerUnit,
+  },
   createdBy,
 ) {
   const resolvedSku = sku || (await generateSku());
   const { rows } = await query(
     `INSERT INTO product_variants (
        company_id, product_id, variant_group_id, sku, barcode, size, color, weight, mrp, selling_price,
-       wholesale_price, dealer_price, cost_price, created_by, updated_by
+       wholesale_price, dealer_price, cost_price, manufacturing_rate_per_unit, packaging_material_cost_per_unit,
+       created_by, updated_by
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16)
      RETURNING *`,
     [
       companyId,
@@ -85,6 +89,8 @@ async function create(
       wholesalePrice || null,
       dealerPrice || null,
       costPrice ?? 0,
+      manufacturingRatePerUnit ?? 0,
+      packagingMaterialCostPerUnit ?? 0,
       createdBy,
     ],
   );
@@ -99,7 +105,9 @@ async function update(companyId, id, fields, updatedBy) {
          weight = COALESCE($7, weight), mrp = COALESCE($8, mrp), selling_price = COALESCE($9, selling_price),
          wholesale_price = COALESCE($10, wholesale_price), dealer_price = COALESCE($11, dealer_price),
          cost_price = COALESCE($12, cost_price), status = COALESCE($13, status),
-         updated_by = $14, updated_at = now()
+         manufacturing_rate_per_unit = COALESCE($14, manufacturing_rate_per_unit),
+         packaging_material_cost_per_unit = COALESCE($15, packaging_material_cost_per_unit),
+         updated_by = $16, updated_at = now()
      WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE
      RETURNING *`,
     [
@@ -116,6 +124,8 @@ async function update(companyId, id, fields, updatedBy) {
       fields.dealerPrice,
       fields.costPrice,
       fields.status,
+      fields.manufacturingRatePerUnit,
+      fields.packagingMaterialCostPerUnit,
       updatedBy,
     ],
   );

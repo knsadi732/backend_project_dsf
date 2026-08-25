@@ -7,11 +7,36 @@ const fixedAssetMaintenanceRepository = require('../repositories/fixedAssetMaint
 const itemRepository = require('../repositories/item.repository');
 const financeService = require('./finance.service');
 
-const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const INDIA_FY_START_MONTH = 3; // April, 0-indexed (Jan = 0)
+const HALF_YEAR_USE_THRESHOLD_DAYS = 180; // Income Tax Act s.32: <180 days used in the year of purchase => half rate
+
+/** 1 April on-or-before `date`'s own financial year. */
+function fyStartFor(date) {
+  const d = new Date(date);
+  const year = d.getMonth() >= INDIA_FY_START_MONTH ? d.getFullYear() : d.getFullYear() - 1;
+  return new Date(year, INDIA_FY_START_MONTH, 1);
+}
+
+/** Exclusive FY end — the 1 April that starts the NEXT financial year. */
+function fyEndFor(fyStart) {
+  return new Date(fyStart.getFullYear() + 1, INDIA_FY_START_MONTH, 1);
+}
 
 /**
  * Net Book Value is always derived, never stored (same pattern as loans.repository.js's
  * outstanding-balance-from-repayments — see loan.service.js).
+ *
+ * Depreciation is booked ONE FULL FINANCIAL YEAR AT A TIME (1 Apr - 31 Mar), not
+ * prorated by the day — the same convention a CA uses when filing (Income Tax
+ * Act s.32, WDV block-of-assets): an asset bought on 31 March belongs to the FY
+ * that ends that day; when that FY's books close, it gets that FY's full
+ * depreciation rate if it was in use 180+ days that FY, or half the rate if it
+ * was in use for fewer days (e.g. bought on the FY's last day = 1 day used).
+ * A financial year in progress (asOfDate still inside it) contributes nothing
+ * yet — that year's charge isn't "closed"/booked until the year itself ends,
+ * which is why an asset bought 31 March shows its first (half-rate) charge the
+ * moment the NEXT financial year begins (1 April), not the moment it was bought.
  */
 function computeNetBookValue(asset, asOfDate = new Date()) {
   const cost = Number(asset.purchase_cost);
@@ -20,17 +45,36 @@ function computeNetBookValue(asset, asOfDate = new Date()) {
   if (asset.status === 'disposed') return 0;
   if (!lifeYears) return cost;
 
-  const yearsElapsed = Math.max((new Date(asOfDate) - new Date(asset.purchase_date)) / MS_PER_YEAR, 0);
-  const depreciableBase = Math.max(cost - salvage, 0);
+  const purchaseDate = new Date(asset.purchase_date);
+  const asOf = new Date(asOfDate);
+  if (asOf <= purchaseDate) return cost;
 
-  if (asset.depreciation_method === 'written_down_value') {
-    const rate = salvage > 0 && cost > 0 ? 1 - (salvage / cost) ** (1 / lifeYears) : 1 / lifeYears;
-    const nbv = cost * (1 - rate) ** Math.min(yearsElapsed, lifeYears);
-    return Math.max(nbv, salvage);
+  const isWdv = asset.depreciation_method === 'written_down_value';
+  const wdvRate = salvage > 0 && cost > 0 ? 1 - (salvage / cost) ** (1 / lifeYears) : 1 / lifeYears;
+  const slmAnnualAmount = Math.max(cost - salvage, 0) / lifeYears;
+
+  let bookValue = cost;
+  let fyStart = fyStartFor(purchaseDate);
+  let yearIndex = 0;
+  // Safety bound only — a fully-depreciated asset stops via bookValue <= salvage.
+  const maxIterations = Math.ceil(lifeYears) + 2;
+
+  while (yearIndex < maxIterations && bookValue > salvage) {
+    const fyEnd = fyEndFor(fyStart);
+    if (asOf < fyEnd) break; // this FY hasn't closed yet — nothing booked for it
+
+    const isPurchaseYear = yearIndex === 0;
+    const daysUsedThisFy = (fyEnd - (isPurchaseYear ? purchaseDate : fyStart)) / DAY_MS;
+    const usageFraction = isPurchaseYear && daysUsedThisFy < HALF_YEAR_USE_THRESHOLD_DAYS ? 0.5 : 1;
+
+    const annualAmount = isWdv ? bookValue * wdvRate : slmAnnualAmount;
+    bookValue -= Math.min(annualAmount * usageFraction, bookValue - salvage);
+
+    fyStart = fyEnd;
+    yearIndex += 1;
   }
 
-  const accumulated = Math.min((depreciableBase / lifeYears) * yearsElapsed, depreciableBase);
-  return Math.max(cost - accumulated, salvage);
+  return Math.max(bookValue, salvage);
 }
 
 function withComputedValue(asset) {
