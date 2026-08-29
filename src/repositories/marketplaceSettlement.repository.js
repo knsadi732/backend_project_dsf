@@ -190,6 +190,19 @@ async function summarizeByProductForMonth(companyId, monthStart, monthEnd) {
   });
 }
 
+/** Real all-time-so-far revenue share per channel — the "own data" replacement for the generic market channel-mix assumption once enough settlements exist. */
+async function totalByChannelSince(companyId, sinceDate) {
+  const { rows } = await query(
+    `SELECT ms.channel_id, mc.name AS channel_name, COALESCE(SUM(ms.gross_sale_amount), 0) AS total
+     FROM marketplace_settlements ms
+     JOIN marketplace_channels mc ON mc.id = ms.channel_id
+     WHERE ms.company_id = $1 AND ms.is_deleted = FALSE AND ms.settlement_date >= $2
+     GROUP BY ms.channel_id, mc.name`,
+    [companyId, sinceDate],
+  );
+  return rows;
+}
+
 module.exports = {
   peekSettlementNumber,
   generateSettlementNumber,
@@ -198,4 +211,5 @@ module.exports = {
   list,
   summarizeByChannelForMonth,
   summarizeByProductForMonth,
+  totalByChannelSince,
 };

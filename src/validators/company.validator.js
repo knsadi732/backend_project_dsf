@@ -44,6 +44,9 @@ const updateSettings = Joi.object({
   notificationSettings: Joi.object().unknown(true),
   // Dashboard KPI: today's actual completed Work Order quantity vs this.
   dailyProductionTarget: Joi.number().integer().min(0).allow(null),
+  // Forecasting bootstrap baseline (forecast.service.js) — used only until
+  // 15+ days of the company's own sales data accumulates.
+  monthlySalesTarget: Joi.number().min(0).allow(null),
 });
 
 module.exports = { updateCompany, createBranch, updateBranch, createWarehouse, updateWarehouse, updateSettings };

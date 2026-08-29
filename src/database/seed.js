@@ -66,6 +66,7 @@ const PERMISSIONS = [
   ['marketplace_channel.manage', 'finance', 'Configure marketplace channel commission/cost/margin assumptions.'],
   ['marketplace_settlement.view', 'finance', 'View marketplace settlements/payment advice records (read-only).'],
   ['marketplace_settlement.manage', 'finance', 'Record marketplace settlements/payment advice.'],
+  ['forecast.view', 'forecast', 'View the sales forecast (Owner/Super Admin only — not granted to Accountant or CA).'],
   ['item.manage', 'item', 'Manage Item & Material Master (categories and items — raw material, packaging, consumables, spare parts, tools, fixed assets, services).'],
   ['item.stock.view', 'item', 'View Item & Material stock levels and movement history.'],
   ['item.stock.manage', 'item', 'Receive and consume Item & Material stock.'],

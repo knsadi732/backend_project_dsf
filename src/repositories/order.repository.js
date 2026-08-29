@@ -26,6 +26,51 @@ async function createItems(client, orderId, items) {
   }
 }
 
+/**
+ * Monthly sales totals for the last `monthsBack` complete-or-in-progress
+ * months (oldest first) — the raw series a sales forecast is built on.
+ * Cancelled orders are excluded; everything else counts (matches how the
+ * dashboard's own sales-summary widget treats "sales").
+ */
+async function monthlySalesSummary(companyId, monthsBack) {
+  const { rows } = await query(
+    `SELECT date_trunc('month', created_at) AS month,
+            COALESCE(SUM(total_amount), 0) AS total_sales,
+            COUNT(*) AS order_count
+     FROM orders
+     WHERE company_id = $1 AND is_deleted = FALSE AND status != 'cancelled'
+       AND created_at >= date_trunc('month', now()) - ($2 || ' months')::interval
+     GROUP BY month
+     ORDER BY month`,
+    [companyId, monthsBack],
+  );
+  return rows;
+}
+
+/** Whether there's enough of the company's OWN sales history to forecast from yet, vs falling back to a market assumption. */
+async function getSalesDataSufficiency(companyId) {
+  const { rows } = await query(
+    `SELECT COUNT(*) AS order_count, MIN(created_at) AS earliest_order_at
+     FROM orders WHERE company_id = $1 AND is_deleted = FALSE AND status != 'cancelled'`,
+    [companyId],
+  );
+  return rows[0];
+}
+
+/** Real historical size-wise unit share for one product — the "own data" replacement for the generic market size-curve assumption once enough sales exist. */
+async function sizeSalesShare(companyId, productId) {
+  const { rows } = await query(
+    `SELECT pv.size, SUM(oi.quantity) AS quantity
+     FROM order_items oi
+     JOIN orders o ON o.id = oi.order_id
+     JOIN product_variants pv ON pv.id = oi.product_variant_id
+     WHERE o.company_id = $1 AND o.is_deleted = FALSE AND o.status != 'cancelled' AND pv.product_id = $2
+     GROUP BY pv.size`,
+    [companyId, productId],
+  );
+  return rows;
+}
+
 async function findById(companyId, id) {
   const { rows } = await query(`SELECT * FROM orders WHERE id = $1 AND company_id = $2 AND is_deleted = FALSE`, [
     id,
@@ -121,4 +166,15 @@ async function updateStatus(client, id, expectedVersion, { status, paymentStatus
   return rows[0] || null;
 }
 
-module.exports = { create, createItems, findById, findByIdForUpdate, findItems, list, updateStatus };
+module.exports = {
+  create,
+  createItems,
+  findById,
+  findByIdForUpdate,
+  findItems,
+  list,
+  updateStatus,
+  monthlySalesSummary,
+  getSalesDataSufficiency,
+  sizeSalesShare,
+};

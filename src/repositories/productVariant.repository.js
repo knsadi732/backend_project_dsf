@@ -16,6 +16,18 @@ async function peekSku(runner = query) {
   return rows[0].sku;
 }
 
+/** Average Selling Price across active, sellable variants — the real (DS-owned) input the market-assumption sales forecast scales a generic monthly-unit-volume benchmark against, instead of guessing a revenue figure outright. */
+async function averageSellingPrice(companyId) {
+  const { rows } = await query(
+    `SELECT AVG(pv.selling_price) AS avg_price
+     FROM product_variants pv
+     JOIN products p ON p.id = pv.product_id
+     WHERE pv.company_id = $1 AND pv.is_deleted = FALSE AND pv.status = 'active' AND pv.selling_price > 0 AND p.is_sellable = TRUE`,
+    [companyId],
+  );
+  return rows[0].avg_price != null ? Number(rows[0].avg_price) : null;
+}
+
 async function list(companyId, pagination, { productId, variantGroupId, status, productType } = {}) {
   const extraConditions = [];
   const extraParams = [];
@@ -142,4 +154,4 @@ async function softDelete(companyId, id, deletedBy) {
   return rows[0] || null;
 }
 
-module.exports = { generateSku, peekSku, list, findById, create, update, softDelete };
+module.exports = { generateSku, peekSku, list, findById, create, update, softDelete, averageSellingPrice };
