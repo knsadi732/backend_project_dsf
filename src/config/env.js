@@ -18,7 +18,14 @@ module.exports = {
   db: {
     host: process.env.PGHOST || 'localhost',
     port: parseInt(process.env.PGPORT || '5432', 10),
-    database: required('PGDATABASE', 'ds_footwear_erp'),
+    // IS_TEST defaults to true (safer default — an unset/misconfigured
+    // value never accidentally lands on the production database).
+    // PGDATABASE is still honored on its own as a fallback for any
+    // environment that hasn't been split into PGDATABASE_TEST/_PRODUCTION.
+    database:
+      process.env.IS_TEST === 'false'
+        ? required('PGDATABASE_PRODUCTION', process.env.PGDATABASE)
+        : required('PGDATABASE_TEST', process.env.PGDATABASE || 'ds_footwear_erp'),
     user: process.env.PGUSER || 'postgres',
     password: process.env.PGPASSWORD || 'postgres',
     max: parseInt(process.env.PG_POOL_MAX || '20', 10),

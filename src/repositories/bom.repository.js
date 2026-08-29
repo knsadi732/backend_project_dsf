@@ -1,10 +1,10 @@
 const { query } = require('../config/db');
 
 const SELECT_WITH_JOINS = `
-  SELECT bom.*, pv.sku, pv.size, pv.color, p2.name AS raw_material_name, p.name AS product_name
+  SELECT bom.*, iv.sku, iv.size, iv.color, i.item_name AS raw_material_name, i.uom AS raw_material_uom, p.name AS product_name
   FROM bill_of_materials bom
-  JOIN product_variants pv ON pv.id = bom.raw_material_variant_id
-  JOIN products p2 ON p2.id = pv.product_id
+  JOIN item_variants iv ON iv.id = bom.raw_material_variant_id
+  JOIN items i ON i.id = iv.item_id
   JOIN products p ON p.id = bom.product_id
 `;
 
