@@ -42,7 +42,7 @@ async function createPurchaseOrder(
 
     const priced = items.map((item) => ({
       productVariantId: item.productVariantId || null,
-      itemId: item.itemId || null,
+      itemVariantId: item.itemVariantId || null,
       quantity: item.quantity,
       unitCost: item.unitCost,
       lineTotal: Number(item.quantity) * Number(item.unitCost),
@@ -111,7 +111,7 @@ async function transitionPurchaseOrder(companyId, id, nextStatus, actorId) {
               actorId,
             });
           } else {
-            await itemService.creditStockFromPurchase(client, companyId, po.warehouse_id, item.item_id, item.quantity, {
+            await itemService.creditStockFromPurchase(client, companyId, po.warehouse_id, item.item_variant_id, item.quantity, {
               referenceType: 'purchase_order',
               referenceId: id,
               actorId,

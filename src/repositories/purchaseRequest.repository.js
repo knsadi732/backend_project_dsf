@@ -47,20 +47,22 @@ async function create(
 async function createItems(client, purchaseRequestId, items) {
   for (const item of items) {
     await client.query(
-      `INSERT INTO purchase_request_items (purchase_request_id, product_variant_id, item_id, quantity, remarks)
+      `INSERT INTO purchase_request_items (purchase_request_id, product_variant_id, item_variant_id, quantity, remarks)
        VALUES ($1, $2, $3, $4, $5)`,
-      [purchaseRequestId, item.productVariantId || null, item.itemId || null, item.quantity, item.remarks || null],
+      [purchaseRequestId, item.productVariantId || null, item.itemVariantId || null, item.quantity, item.remarks || null],
     );
   }
 }
 
-// Item Master's own name/code fields, alongside the product_variants ones —
-// exactly one side is non-null per row (see the DB's xor CHECK constraint).
+// Item Master's own Variant (SKU/size/color) + parent Item name/code, alongside
+// the product_variants ones — exactly one side is non-null per row (see the
+// DB's xor CHECK constraint).
 const ITEM_LINE_JOIN = `
      LEFT JOIN product_variants pv ON pv.id = pri.product_variant_id
      LEFT JOIN products p ON p.id = pv.product_id
-     LEFT JOIN items it ON it.id = pri.item_id`;
-const ITEM_LINE_COLUMNS = `pri.*, pv.sku, pv.size, pv.color, p.name AS product_name, it.item_code, it.item_name, it.uom AS item_uom`;
+     LEFT JOIN item_variants iv ON iv.id = pri.item_variant_id
+     LEFT JOIN items it ON it.id = iv.item_id`;
+const ITEM_LINE_COLUMNS = `pri.*, pv.sku, pv.size, pv.color, p.name AS product_name, iv.sku AS item_sku, iv.size AS item_size, iv.color AS item_color, it.item_code, it.item_name, it.uom AS item_uom`;
 
 async function findById(companyId, id) {
   const { rows } = await query(

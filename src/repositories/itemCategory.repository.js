@@ -38,12 +38,28 @@ async function findById(companyId, id) {
   return rows[0] || null;
 }
 
+/** Reserves and returns the next category code, e.g. 'CAT-00001'. Each call consumes the sequence. */
+async function generateCategoryCode(runner = query) {
+  const { rows } = await runner(`SELECT 'CAT-' || LPAD(nextval('item_categories_cat_seq')::text, 5, '0') AS category_code`);
+  return rows[0].category_code;
+}
+
+/** Previews the next category code without consuming the sequence — safe to call repeatedly (e.g. on every modal open). */
+async function peekCategoryCode(runner = query) {
+  const { rows } = await runner(
+    `SELECT 'CAT-' || LPAD((CASE WHEN is_called THEN last_value + 1 ELSE last_value END)::text, 5, '0') AS category_code
+     FROM item_categories_cat_seq`,
+  );
+  return rows[0].category_code;
+}
+
 async function create(companyId, { parentCategoryId, categoryName, categoryCode, stockKind }, createdBy) {
+  const code = categoryCode || (await generateCategoryCode());
   const { rows } = await query(
     `INSERT INTO item_categories (company_id, parent_category_id, category_name, category_code, stock_kind, created_by, updated_by)
      VALUES ($1, $2, $3, $4, $5, $6, $6)
      RETURNING *`,
-    [companyId, parentCategoryId || null, categoryName, categoryCode || null, stockKind || 'raw_material', createdBy],
+    [companyId, parentCategoryId || null, categoryName, code, stockKind || 'raw_material', createdBy],
   );
   return rows[0];
 }
@@ -71,4 +87,4 @@ async function softDelete(companyId, id, deletedBy) {
   return rows[0] || null;
 }
 
-module.exports = { list, findById, create, update, softDelete };
+module.exports = { list, findById, create, update, softDelete, generateCategoryCode, peekCategoryCode };

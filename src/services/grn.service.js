@@ -45,7 +45,7 @@ async function createGrnFromPurchaseOrder(client, companyId, po, actorId) {
     items.map((item) => ({
       purchaseOrderItemId: item.id,
       productVariantId: item.product_variant_id,
-      itemId: item.item_id,
+      itemVariantId: item.item_variant_id,
       orderedQuantity: item.quantity,
       receivedQuantity: item.quantity,
       unitCost: item.unit_cost,

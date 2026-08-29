@@ -28,6 +28,10 @@ const createItem = Joi.object({
   standardCost: Joi.number().min(0),
   reorderLevel: Joi.number().min(0),
   specification: Joi.object().unknown(true),
+  // Seeds the Item's first Variant (Chapter 8 — Item -> Variant -> SKU) —
+  // both optional, a bare Item can have one un-sized/un-colored Variant.
+  size: Joi.string().max(30).allow(null, ''),
+  color: Joi.string().max(50).allow(null, ''),
 });
 
 const updateItem = Joi.object({
@@ -41,6 +45,24 @@ const updateItem = Joi.object({
   standardCost: Joi.number().min(0),
   reorderLevel: Joi.number().min(0),
   specification: Joi.object().unknown(true),
+  status: Joi.string().valid('active', 'inactive', 'discontinued'),
+});
+
+// Item Variants (Chapter 8 — Item -> Variant -> SKU, mirrors Product -> Product Variant)
+const createItemVariant = Joi.object({
+  itemId: Joi.string().guid().required(),
+  sku: Joi.string().max(100).allow(null, ''),
+  size: Joi.string().max(30).allow(null, ''),
+  color: Joi.string().max(50).allow(null, ''),
+  standardCost: Joi.number().min(0).allow(null),
+  remarks: Joi.string().allow(null, ''),
+});
+
+const updateItemVariant = Joi.object({
+  size: Joi.string().max(30).allow(null, ''),
+  color: Joi.string().max(50).allow(null, ''),
+  standardCost: Joi.number().min(0).allow(null),
+  remarks: Joi.string().allow(null, ''),
   status: Joi.string().valid('active', 'inactive', 'discontinued'),
 });
 
@@ -58,7 +80,7 @@ const gstDetail = Joi.object({
 
 const receiveStock = Joi.object({
   warehouseId: Joi.string().guid().required(),
-  itemId: Joi.string().guid().required(),
+  itemVariantId: Joi.string().guid().required(),
   quantity: Joi.number().positive().required(),
   unitCost: Joi.number().min(0),
   description: Joi.string().allow(null, ''),
@@ -76,7 +98,7 @@ const receiveStock = Joi.object({
 
 const consumeStock = Joi.object({
   warehouseId: Joi.string().guid().required(),
-  itemId: Joi.string().guid().required(),
+  itemVariantId: Joi.string().guid().required(),
   quantity: Joi.number().positive().required(),
   remarks: Joi.string().allow(null, ''),
 });
@@ -86,6 +108,8 @@ module.exports = {
   updateItemCategory,
   createItem,
   updateItem,
+  createItemVariant,
+  updateItemVariant,
   receiveStock,
   consumeStock,
 };

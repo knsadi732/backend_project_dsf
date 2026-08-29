@@ -1,5 +1,4 @@
 const { query } = require('../config/db');
-const { buildListQuery } = require('../utils/queryBuilder');
 
 const SELECT_WITH_JOINS = `
   SELECT i.*, ic.category_name AS item_category_name, ic.stock_kind, v.name AS preferred_vendor_name
@@ -8,23 +7,35 @@ const SELECT_WITH_JOINS = `
   LEFT JOIN vendors v ON v.id = i.preferred_vendor_id
 `;
 
+// Raw SQL rather than buildListQuery — that helper only ever builds a plain
+// `SELECT * FROM <table>`, so the list view previously never joined
+// category/vendor names at all (only findById did), leaving Category and
+// Preferred Vendor blank ("—") on every row regardless of the item's actual
+// data.
 async function list(companyId, pagination, { itemCategoryId } = {}) {
-  const extraConditions = [];
-  const extraParams = [];
+  const conditions = ['i.company_id = $1', 'i.is_deleted = FALSE'];
+  const params = [companyId];
+
   if (itemCategoryId) {
-    extraConditions.push(`item_category_id = $${extraParams.length + 2}`);
-    extraParams.push(itemCategoryId);
+    params.push(itemCategoryId);
+    conditions.push(`i.item_category_id = $${params.length}`);
+  }
+  if (pagination.search) {
+    params.push(`%${pagination.search}%`);
+    conditions.push(`(i.item_name ILIKE $${params.length} OR i.item_code ILIKE $${params.length})`);
   }
 
-  const { dataSql, dataParams, countSql, countParams } = buildListQuery({
-    table: 'items',
-    companyId,
-    pagination,
-    searchableColumns: ['item_name', 'item_code'],
-    extraConditions,
-    extraParams,
-  });
-  const [data, count] = await Promise.all([query(dataSql, dataParams), query(countSql, countParams)]);
+  const whereClause = `WHERE ${conditions.join(' AND ')}`;
+  const safeSortBy = /^[a-zA-Z_]+$/.test(pagination.sortBy) ? pagination.sortBy : 'created_at';
+  const safeSortOrder = pagination.sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+  const dataSql = `${SELECT_WITH_JOINS} ${whereClause} ORDER BY i.${safeSortBy} ${safeSortOrder} LIMIT $${
+    params.length + 1
+  } OFFSET $${params.length + 2}`;
+  const dataParams = [...params, pagination.limit, pagination.offset];
+  const countSql = `SELECT COUNT(*) FROM items i ${whereClause}`;
+
+  const [data, count] = await Promise.all([query(dataSql, dataParams), query(countSql, params)]);
   return { rows: data.rows, totalRecords: parseInt(count.rows[0].count, 10) };
 }
 
@@ -41,13 +52,24 @@ async function generateItemCode(runner = query) {
   return rows[0].item_code;
 }
 
+/** Previews the next item code without consuming the sequence — safe to call repeatedly (e.g. on every modal open). */
+async function peekItemCode(runner = query) {
+  const { rows } = await runner(
+    `SELECT 'ITM-' || LPAD((CASE WHEN is_called THEN last_value + 1 ELSE last_value END)::text, 5, '0') AS item_code
+     FROM items_item_seq`,
+  );
+  return rows[0].item_code;
+}
+
 async function create(
   companyId,
   { itemCategoryId, preferredVendorId, itemCode, itemName, description, uom, hsnCode, gstPercentage, standardCost, reorderLevel, specification },
   createdBy,
+  client,
 ) {
-  const code = itemCode || (await generateItemCode());
-  const { rows } = await query(
+  const runner = client ?? { query };
+  const code = itemCode || (await generateItemCode((text, params) => runner.query(text, params)));
+  const { rows } = await runner.query(
     `INSERT INTO items (company_id, item_category_id, preferred_vendor_id, item_code, item_name, description, uom,
                          hsn_code, gst_percentage, standard_cost, reorder_level, specification, created_by, updated_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)
@@ -123,4 +145,4 @@ async function softDelete(companyId, id, deletedBy) {
   return rows[0] || null;
 }
 
-module.exports = { list, findById, create, update, softDelete, generateItemCode };
+module.exports = { list, findById, create, update, softDelete, generateItemCode, peekItemCode };

@@ -41,9 +41,9 @@ async function create(
 async function createItems(client, grnId, items) {
   for (const item of items) {
     await client.query(
-      `INSERT INTO grn_items (grn_id, purchase_order_item_id, product_variant_id, item_id, ordered_quantity, received_quantity, unit_cost)
+      `INSERT INTO grn_items (grn_id, purchase_order_item_id, product_variant_id, item_variant_id, ordered_quantity, received_quantity, unit_cost)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [grnId, item.purchaseOrderItemId, item.productVariantId || null, item.itemId || null, item.orderedQuantity, item.receivedQuantity, item.unitCost],
+      [grnId, item.purchaseOrderItemId, item.productVariantId || null, item.itemVariantId || null, item.orderedQuantity, item.receivedQuantity, item.unitCost],
     );
   }
 }
@@ -85,11 +85,14 @@ async function updateVendorInvoice(client, companyId, grnId, documentId) {
 
 async function findItems(grnId) {
   const { rows } = await query(
-    `SELECT gi.*, pv.sku, pv.size, pv.color, p.name AS product_name, it.item_code, it.item_name, it.uom AS item_uom
+    `SELECT gi.*, pv.sku, pv.size, pv.color, p.name AS product_name,
+            iv.sku AS item_sku, iv.size AS item_size, iv.color AS item_color,
+            it.item_code, it.item_name, it.uom AS item_uom
      FROM grn_items gi
      LEFT JOIN product_variants pv ON pv.id = gi.product_variant_id
      LEFT JOIN products p ON p.id = pv.product_id
-     LEFT JOIN items it ON it.id = gi.item_id
+     LEFT JOIN item_variants iv ON iv.id = gi.item_variant_id
+     LEFT JOIN items it ON it.id = iv.item_id
      WHERE gi.grn_id = $1`,
     [grnId],
   );

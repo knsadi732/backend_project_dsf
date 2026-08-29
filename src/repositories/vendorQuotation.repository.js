@@ -32,18 +32,19 @@ async function create(
 async function createItems(client, vendorQuotationId, items) {
   for (const item of items) {
     await client.query(
-      `INSERT INTO vendor_quotation_items (vendor_quotation_id, product_variant_id, item_id, unit_price, gst_percentage)
+      `INSERT INTO vendor_quotation_items (vendor_quotation_id, product_variant_id, item_variant_id, unit_price, gst_percentage)
        VALUES ($1, $2, $3, $4, $5)`,
-      [vendorQuotationId, item.productVariantId || null, item.itemId || null, item.unitPrice, item.gstPercentage ?? 0],
+      [vendorQuotationId, item.productVariantId || null, item.itemVariantId || null, item.unitPrice, item.gstPercentage ?? 0],
     );
   }
 }
 
-const VQ_ITEM_COLUMNS = `vqi.*, pv.sku, pv.size, pv.color, p.name AS product_name, it.item_code, it.item_name, it.uom AS item_uom`;
+const VQ_ITEM_COLUMNS = `vqi.*, pv.sku, pv.size, pv.color, p.name AS product_name, iv.sku AS item_sku, iv.size AS item_size, iv.color AS item_color, it.item_code, it.item_name, it.uom AS item_uom`;
 const VQ_ITEM_JOIN = `
      LEFT JOIN product_variants pv ON pv.id = vqi.product_variant_id
      LEFT JOIN products p ON p.id = pv.product_id
-     LEFT JOIN items it ON it.id = vqi.item_id`;
+     LEFT JOIN item_variants iv ON iv.id = vqi.item_variant_id
+     LEFT JOIN items it ON it.id = iv.item_id`;
 
 async function findItems(vendorQuotationId, runner = query) {
   const { rows } = await runner(

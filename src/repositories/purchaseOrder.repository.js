@@ -74,9 +74,9 @@ async function create(
 async function createItems(client, purchaseOrderId, items) {
   for (const item of items) {
     await client.query(
-      `INSERT INTO purchase_order_items (purchase_order_id, product_variant_id, item_id, quantity, unit_cost, line_total)
+      `INSERT INTO purchase_order_items (purchase_order_id, product_variant_id, item_variant_id, quantity, unit_cost, line_total)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [purchaseOrderId, item.productVariantId || null, item.itemId || null, item.quantity, item.unitCost, item.lineTotal],
+      [purchaseOrderId, item.productVariantId || null, item.itemVariantId || null, item.quantity, item.unitCost, item.lineTotal],
     );
   }
 }
@@ -100,11 +100,13 @@ async function findByIdForUpdate(client, companyId, id) {
 async function findItems(purchaseOrderId) {
   const { rows } = await query(
     `SELECT poi.*, pv.sku, pv.size, pv.color, p.name AS product_name, p.hsn_code, p.uom,
+            iv.sku AS item_sku, iv.size AS item_size, iv.color AS item_color,
             it.item_code, it.item_name, it.uom AS item_uom
      FROM purchase_order_items poi
      LEFT JOIN product_variants pv ON pv.id = poi.product_variant_id
      LEFT JOIN products p ON p.id = pv.product_id
-     LEFT JOIN items it ON it.id = poi.item_id
+     LEFT JOIN item_variants iv ON iv.id = poi.item_variant_id
+     LEFT JOIN items it ON it.id = iv.item_id
      WHERE poi.purchase_order_id = $1`,
     [purchaseOrderId],
   );

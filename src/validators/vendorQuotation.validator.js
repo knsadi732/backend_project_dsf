@@ -9,16 +9,17 @@ const recordVendorQuotation = Joi.object({
   freightAmount: Joi.number().min(0).default(0),
   discountAmount: Joi.number().min(0).default(0),
   remarks: Joi.string().allow(null, ''),
-  // Exactly one of productVariantId / itemId per line — mirrors whatever the
-  // linked RFQ's material items (from its Purchase Request) actually are.
+  // Exactly one of productVariantId / itemVariantId per line — mirrors
+  // whatever the linked RFQ's material items (from its Purchase Request)
+  // actually are.
   items: Joi.array()
     .items(
       Joi.object({
         productVariantId: Joi.string().guid(),
-        itemId: Joi.string().guid(),
+        itemVariantId: Joi.string().guid(),
         unitPrice: Joi.number().min(0).required(),
         gstPercentage: Joi.number().min(0).max(100).default(0),
-      }).xor('productVariantId', 'itemId'),
+      }).xor('productVariantId', 'itemVariantId'),
     )
     .min(1)
     .required(),
