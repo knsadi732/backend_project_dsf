@@ -186,6 +186,7 @@ async function softDelete(companyId, id, deletedBy) {
 }
 
 module.exports = {
+  generateWorkOrderNumber,
   create,
   findById,
   findByIdForUpdate,

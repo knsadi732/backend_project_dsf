@@ -3,6 +3,11 @@ const { sendSuccess } = require('../utils/response');
 const workOrderService = require('../services/workOrder.service');
 const { getOverheadPerUnitForMonth } = require('../services/overheadAllocation.service');
 
+const generateNumber = asyncHandler(async (req, res) => {
+  const workOrderNumber = workOrderService.generateWorkOrderNumber();
+  return sendSuccess(res, { message: 'Generated work order number.', data: { workOrderNumber } });
+});
+
 const create = asyncHandler(async (req, res) => {
   const workOrder = await workOrderService.createWorkOrder(req.tenant.companyId, req.body, req.user.id);
   return sendSuccess(res, { message: 'Work order created.', data: workOrder, statusCode: 201 });
@@ -38,4 +43,4 @@ const overheadPerUnit = asyncHandler(async (req, res) => {
   return sendSuccess(res, { message: 'Current month overhead per unit.', data });
 });
 
-module.exports = { create, list, getOne, update, remove, advanceFloorStage, overheadPerUnit };
+module.exports = { generateNumber, create, list, getOne, update, remove, advanceFloorStage, overheadPerUnit };

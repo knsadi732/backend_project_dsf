@@ -12,6 +12,15 @@ const productVariantRepository = require('../repositories/productVariant.reposit
 const { FLOOR_STAGES } = require('../validators/workOrder.validator');
 const { reallocateOverheadForMonth, monthStartOf } = require('./overheadAllocation.service');
 
+// Previews a work order number without persisting anything — the number
+// itself isn't sequence-backed (workOrder.repository.js#generateWorkOrderNumber
+// is timestamp+random, always unique per call), so "preview" and "generate"
+// are the same call; the frontend sends this value back on create so what
+// the user saw is what gets saved, unless they typed their own.
+function generateWorkOrderNumber() {
+  return workOrderRepository.generateWorkOrderNumber();
+}
+
 async function createWorkOrder(companyId, payload, actorId) {
   return withTransaction(async (client) => {
     const workOrder = await workOrderRepository.create(client, companyId, payload, actorId);
@@ -200,6 +209,7 @@ async function checkLowStockAndReplenish(client, companyId, productId, productVa
 }
 
 module.exports = {
+  generateWorkOrderNumber,
   createWorkOrder,
   getWorkOrder,
   listWorkOrders,
