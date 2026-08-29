@@ -3,8 +3,11 @@ const { withTransaction } = require('../config/db');
 const { buildPaginationMeta } = require('../utils/pagination');
 const mirRepository = require('../repositories/materialIssueRequest.repository');
 const bomRepository = require('../repositories/bom.repository');
-const stockRepository = require('../repositories/stock.repository');
-const inventoryMovementRepository = require('../repositories/inventoryMovement.repository');
+// Raw material lives in the Item & Material Master domain (Chapter 8), not
+// Product — so its stock/movements come from itemStock.repository, never
+// stock.repository/inventoryMovement.repository (those are product_variant/
+// warehouse_stock only).
+const itemStockRepository = require('../repositories/itemStock.repository');
 const purchaseRequestRepository = require('../repositories/purchaseRequest.repository');
 
 /**
