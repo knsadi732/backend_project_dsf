@@ -47,12 +47,20 @@ async function create(
 async function createItems(client, purchaseRequestId, items) {
   for (const item of items) {
     await client.query(
-      `INSERT INTO purchase_request_items (purchase_request_id, product_variant_id, quantity, remarks)
-       VALUES ($1, $2, $3, $4)`,
-      [purchaseRequestId, item.productVariantId, item.quantity, item.remarks || null],
+      `INSERT INTO purchase_request_items (purchase_request_id, product_variant_id, item_id, quantity, remarks)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [purchaseRequestId, item.productVariantId || null, item.itemId || null, item.quantity, item.remarks || null],
     );
   }
 }
+
+// Item Master's own name/code fields, alongside the product_variants ones —
+// exactly one side is non-null per row (see the DB's xor CHECK constraint).
+const ITEM_LINE_JOIN = `
+     LEFT JOIN product_variants pv ON pv.id = pri.product_variant_id
+     LEFT JOIN products p ON p.id = pv.product_id
+     LEFT JOIN items it ON it.id = pri.item_id`;
+const ITEM_LINE_COLUMNS = `pri.*, pv.sku, pv.size, pv.color, p.name AS product_name, it.item_code, it.item_name, it.uom AS item_uom`;
 
 async function findById(companyId, id) {
   const { rows } = await query(
@@ -72,10 +80,9 @@ async function findByIdForUpdate(client, companyId, id) {
 
 async function findItems(purchaseRequestId, runner = query) {
   const { rows } = await runner(
-    `SELECT pri.*, pv.sku, pv.size, pv.color, p.name AS product_name
+    `SELECT ${ITEM_LINE_COLUMNS}
      FROM purchase_request_items pri
-     LEFT JOIN product_variants pv ON pv.id = pri.product_variant_id
-     LEFT JOIN products p ON p.id = pv.product_id
+     ${ITEM_LINE_JOIN}
      WHERE pri.purchase_request_id = $1`,
     [purchaseRequestId],
   );
@@ -111,10 +118,9 @@ async function list(companyId, pagination, { status } = {}) {
   let itemsByPr = {};
   if (prIds.length) {
     const { rows: items } = await query(
-      `SELECT pri.*, pv.sku, pv.size, pv.color, p.name AS product_name
+      `SELECT ${ITEM_LINE_COLUMNS}
        FROM purchase_request_items pri
-       LEFT JOIN product_variants pv ON pv.id = pri.product_variant_id
-       LEFT JOIN products p ON p.id = pv.product_id
+       ${ITEM_LINE_JOIN}
        WHERE pri.purchase_request_id = ANY($1)`,
       [prIds],
     );

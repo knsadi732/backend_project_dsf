@@ -32,19 +32,24 @@ async function create(
 async function createItems(client, vendorQuotationId, items) {
   for (const item of items) {
     await client.query(
-      `INSERT INTO vendor_quotation_items (vendor_quotation_id, product_variant_id, unit_price, gst_percentage)
-       VALUES ($1, $2, $3, $4)`,
-      [vendorQuotationId, item.productVariantId, item.unitPrice, item.gstPercentage ?? 0],
+      `INSERT INTO vendor_quotation_items (vendor_quotation_id, product_variant_id, item_id, unit_price, gst_percentage)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [vendorQuotationId, item.productVariantId || null, item.itemId || null, item.unitPrice, item.gstPercentage ?? 0],
     );
   }
 }
 
-async function findItems(vendorQuotationId, runner = query) {
-  const { rows } = await runner(
-    `SELECT vqi.*, pv.sku, pv.size, pv.color, p.name AS product_name
-     FROM vendor_quotation_items vqi
+const VQ_ITEM_COLUMNS = `vqi.*, pv.sku, pv.size, pv.color, p.name AS product_name, it.item_code, it.item_name, it.uom AS item_uom`;
+const VQ_ITEM_JOIN = `
      LEFT JOIN product_variants pv ON pv.id = vqi.product_variant_id
      LEFT JOIN products p ON p.id = pv.product_id
+     LEFT JOIN items it ON it.id = vqi.item_id`;
+
+async function findItems(vendorQuotationId, runner = query) {
+  const { rows } = await runner(
+    `SELECT ${VQ_ITEM_COLUMNS}
+     FROM vendor_quotation_items vqi
+     ${VQ_ITEM_JOIN}
      WHERE vqi.vendor_quotation_id = $1`,
     [vendorQuotationId],
   );
@@ -85,10 +90,9 @@ async function findByRfqId(companyId, rfqId) {
   let itemsByQuotation = {};
   if (quotationIds.length) {
     const { rows: items } = await query(
-      `SELECT vqi.*, pv.sku, pv.size, pv.color, p.name AS product_name
+      `SELECT ${VQ_ITEM_COLUMNS}
        FROM vendor_quotation_items vqi
-       LEFT JOIN product_variants pv ON pv.id = vqi.product_variant_id
-       LEFT JOIN products p ON p.id = pv.product_id
+       ${VQ_ITEM_JOIN}
        WHERE vqi.vendor_quotation_id = ANY($1)`,
       [quotationIds],
     );

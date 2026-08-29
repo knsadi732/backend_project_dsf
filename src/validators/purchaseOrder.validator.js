@@ -10,13 +10,16 @@ const createPurchaseOrder = Joi.object({
   taxAmount: Joi.number().min(0).default(0),
   paymentTerms: Joi.string().max(255).allow(null, ''),
   expectedDeliveryDate: Joi.date().allow(null),
+  // Exactly one of productVariantId / itemId per line — see Chapter 8/12
+  // (Item & Material Master rows can now be ordered through Purchase too).
   items: Joi.array()
     .items(
       Joi.object({
-        productVariantId: Joi.string().guid().required(),
+        productVariantId: Joi.string().guid(),
+        itemId: Joi.string().guid(),
         quantity: Joi.number().positive().required(),
         unitCost: Joi.number().min(0).required(),
-      }),
+      }).xor('productVariantId', 'itemId'),
     )
     .min(1)
     .required(),

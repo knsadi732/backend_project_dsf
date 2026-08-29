@@ -11,13 +11,17 @@ const createPurchaseRequest = Joi.object({
     .default(PURCHASE_REQUEST_PRIORITY.MEDIUM),
   requiredDate: Joi.date().allow(null),
   remarks: Joi.string().allow(null, ''),
+  // Exactly one of productVariantId (sellable Product) / itemId (Item &
+  // Material Master — raw material, packaging, consumable, spare, tool,
+  // service) per line — mirrors the DB's xor CHECK constraint.
   items: Joi.array()
     .items(
       Joi.object({
-        productVariantId: Joi.string().guid().required(),
+        productVariantId: Joi.string().guid(),
+        itemId: Joi.string().guid(),
         quantity: Joi.number().positive().required(),
         remarks: Joi.string().allow(null, ''),
-      }),
+      }).xor('productVariantId', 'itemId'),
     )
     .min(1)
     .required(),

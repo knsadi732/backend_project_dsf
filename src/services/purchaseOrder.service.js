@@ -9,6 +9,7 @@ const rfqRepository = require('../repositories/rfq.repository');
 const vendorQuotationRepository = require('../repositories/vendorQuotation.repository');
 const rfqService = require('./rfq.service');
 const stockService = require('./stock.service');
+const itemService = require('./item.service');
 const grnService = require('./grn.service');
 
 /**
@@ -40,7 +41,8 @@ async function createPurchaseOrder(
     }
 
     const priced = items.map((item) => ({
-      productVariantId: item.productVariantId,
+      productVariantId: item.productVariantId || null,
+      itemId: item.itemId || null,
       quantity: item.quantity,
       unitCost: item.unitCost,
       lineTotal: Number(item.quantity) * Number(item.unitCost),
@@ -102,11 +104,19 @@ async function transitionPurchaseOrder(companyId, id, nextStatus, actorId) {
       if (nextStatus === PURCHASE_ORDER_STATUS.PARTIALLY_RECEIVED) {
         const items = await purchaseOrderRepository.findItems(id);
         for (const item of items) {
-          await stockService.receiveStock(client, companyId, po.warehouse_id, item.product_variant_id, item.quantity, {
-            referenceType: 'purchase_order',
-            referenceId: id,
-            actorId,
-          });
+          if (item.product_variant_id) {
+            await stockService.receiveStock(client, companyId, po.warehouse_id, item.product_variant_id, item.quantity, {
+              referenceType: 'purchase_order',
+              referenceId: id,
+              actorId,
+            });
+          } else {
+            await itemService.creditStockFromPurchase(client, companyId, po.warehouse_id, item.item_id, item.quantity, {
+              referenceType: 'purchase_order',
+              referenceId: id,
+              actorId,
+            });
+          }
         }
       }
 

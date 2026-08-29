@@ -152,6 +152,30 @@ async function listItemStock(companyId, pagination, filters) {
   return { rows, meta: buildPaginationMeta({ page: pagination.page, limit: pagination.limit, totalRecords }) };
 }
 
+/**
+ * Stock-only credit for an Item Master row received via a Purchase Order
+ * (Chapter 12) — the item-domain equivalent of stock.service.js#receiveStock.
+ * Unlike the manual receiveStock() above, this never posts a Finance expense
+ * itself: a PO's cost already flows to the vendor through the normal
+ * PO -> GRN -> Vendor Bill trail (vendorBill.service.js), so posting one
+ * here too would double-count it. Takes the caller's own transaction
+ * `client` so it commits atomically with the PO status transition.
+ */
+async function creditStockFromPurchase(client, companyId, warehouseId, itemId, quantity, { referenceType, referenceId, actorId } = {}) {
+  const stock = await itemStockRepository.lockOrCreateForUpdate(client, companyId, warehouseId, itemId);
+  const quantityOnHandAfter = Number(stock.quantity_on_hand) + Number(quantity);
+  await itemStockRepository.setQuantities(client, stock.id, {
+    quantityOnHand: quantityOnHandAfter,
+    quantityReserved: stock.quantity_reserved,
+  });
+  return itemStockRepository.recordMovement(
+    client,
+    companyId,
+    { warehouseId, itemId, movementType: 'receipt', quantityChange: quantity, quantityOnHandAfter, referenceType, referenceId },
+    actorId,
+  );
+}
+
 async function listItemStockMovements(companyId, pagination, filters) {
   const { rows, totalRecords } = await itemStockRepository.listMovements(companyId, pagination, filters);
   return { rows, meta: buildPaginationMeta({ page: pagination.page, limit: pagination.limit, totalRecords }) };
@@ -167,6 +191,7 @@ module.exports = {
   getItem,
   updateItem,
   receiveStock,
+  creditStockFromPurchase,
   consumeStock,
   listItemStock,
   listItemStockMovements,
