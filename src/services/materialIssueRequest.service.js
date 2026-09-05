@@ -71,40 +71,26 @@ async function approve(companyId, id, actorId) {
     const items = await mirRepository.findItems(id, (text, params) => client.query(text, params));
     const shortfallItems = [];
     for (const item of items) {
-      const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, mir.warehouse_id, item.raw_material_variant_id);
+      const stock = await itemStockRepository.lockOrCreateForUpdate(client, companyId, mir.warehouse_id, item.raw_material_variant_id);
       const available = Math.max(Number(stock.quantity_on_hand) - Number(stock.quantity_reserved), 0);
       const reserveQty = Math.min(Number(item.quantity_required), available);
 
       if (reserveQty > 0) {
-        const updatedStock = await stockRepository.setQuantities(client, stock.id, {
+        // Reservation only — quantity_on_hand doesn't move yet, so nothing
+        // is logged to item_stock_movements (that table only tracks actual
+        // physical quantity_change, no reserved-only entries; the reserved
+        // total itself is tracked on item_stock via setQuantities below).
+        await itemStockRepository.setQuantities(client, stock.id, {
           quantityOnHand: stock.quantity_on_hand,
           quantityReserved: Number(stock.quantity_reserved) + reserveQty,
         });
-        await inventoryMovementRepository.record(
-          client,
-          companyId,
-          {
-            warehouseId: mir.warehouse_id,
-            productVariantId: item.raw_material_variant_id,
-            // Not 'sales_reservation' — that name is order-specific in the
-            // fixed movement-type list; this is a raw-material reservation
-            // for production, closest neutral fit is stock_adjustment.
-            movementType: 'stock_adjustment',
-            quantityReservedChange: reserveQty,
-            quantityOnHandAfter: updatedStock.quantity_on_hand,
-            quantityReservedAfter: updatedStock.quantity_reserved,
-            referenceType: 'material_issue_request',
-            referenceId: id,
-          },
-          actorId,
-        );
       }
       await mirRepository.setItemReserved(client, item.id, reserveQty);
 
       const shortfall = Number(item.quantity_required) - reserveQty;
       if (shortfall > 0) {
         shortfallItems.push({
-          productVariantId: item.raw_material_variant_id,
+          itemVariantId: item.raw_material_variant_id,
           quantity: shortfall,
           remarks: `Auto-raised: ${mir.mir_number} approved with a raw material shortfall`,
         });
@@ -192,7 +178,7 @@ async function issue(companyId, id, actorId, requestedItems) {
         );
       }
 
-      const stock = await stockRepository.lockOrCreateForUpdate(client, companyId, mir.warehouse_id, item.raw_material_variant_id);
+      const stock = await itemStockRepository.lockOrCreateForUpdate(client, companyId, mir.warehouse_id, item.raw_material_variant_id);
       let onHand = Number(stock.quantity_on_hand);
       let reserved = Number(stock.quantity_reserved);
 
@@ -217,18 +203,16 @@ async function issue(companyId, id, actorId, requestedItems) {
       onHand -= requestedQty;
       reserved = Math.max(reserved - fromReserved, 0);
 
-      const updatedStock = await stockRepository.setQuantities(client, stock.id, { quantityOnHand: onHand, quantityReserved: reserved });
-      await inventoryMovementRepository.record(
+      const updatedStock = await itemStockRepository.setQuantities(client, stock.id, { quantityOnHand: onHand, quantityReserved: reserved });
+      await itemStockRepository.recordMovement(
         client,
         companyId,
         {
           warehouseId: mir.warehouse_id,
-          productVariantId: item.raw_material_variant_id,
-          movementType: 'stock_adjustment',
+          itemVariantId: item.raw_material_variant_id,
+          movementType: 'consumption',
           quantityChange: -requestedQty,
-          quantityReservedChange: -fromReserved,
           quantityOnHandAfter: updatedStock.quantity_on_hand,
-          quantityReservedAfter: updatedStock.quantity_reserved,
           referenceType: 'material_issue_request',
           referenceId: id,
           remarks: 'Raw material issued to production',

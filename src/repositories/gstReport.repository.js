@@ -110,7 +110,11 @@ async function getCategoryTotals(companyId, period) {
      -- its full cost is not a period expense, only its depreciation is (added
      -- separately by gstReport.service.js#getProfitAndLoss as a 'Depreciation' line).
      LEFT JOIN fixed_assets fa ON fa.finance_transaction_id = tx.id AND fa.is_deleted = FALSE
-     WHERE fa.id IS NULL AND ${conditions.join(' AND ')}
+     -- 'manual' entries (fund transfers/capital injections between owner and
+     -- business, refunds, etc.) are financing activity, not revenue or a
+     -- period expense — a credit here isn't a "sale" just because its
+     -- direction happens to be credit, so it must never land in Total Sales.
+     WHERE fa.id IS NULL AND tx.reference_type <> 'manual' AND ${conditions.join(' AND ')}
      GROUP BY tx.category, tx.direction
      ORDER BY tx.category`,
     params,

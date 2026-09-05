@@ -1,4 +1,7 @@
-require('dotenv').config();
+// override: true — a stray OS/session-level env var (e.g. IS_TEST set once
+// in a long-lived terminal) must never silently beat what's in .env, or the
+// app can end up pointed at the wrong database with no visible error.
+require('dotenv').config({ override: true });
 const path = require('path');
 
 function required(name, fallback) {

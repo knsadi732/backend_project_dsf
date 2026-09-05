@@ -12,6 +12,7 @@ const settingsRepository = require('../repositories/settings.repository');
 const companyRepository = require('../repositories/company.repository');
 const statutoryAuditRepository = require('../repositories/statutoryAudit.repository');
 const fundingSourceRepository = require('../repositories/fundingSource.repository');
+const payableRepository = require('../repositories/payable.repository');
 
 /** Blocks new postings dated inside a fiscal period the CA has already closed. */
 async function assertPostingDateOpen(companyId, date = new Date()) {
@@ -33,18 +34,31 @@ const FIXED_DIRECTION_BY_REFERENCE_TYPE = {
   expense: 'debit',
 };
 
-async function recordTransaction(companyId, { branchId, transactionDate, referenceType, referenceId, direction, amount, description }, actorId) {
+async function recordTransaction(
+  companyId,
+  { branchId, transactionDate, referenceType, referenceId, direction, amount, description, fundingSourceId, fundingType, partyName, paymentMode, utrReference },
+  actorId,
+) {
   const date = transactionDate || new Date();
   const resolvedDirection = FIXED_DIRECTION_BY_REFERENCE_TYPE[referenceType] || direction;
   return withTransaction(
     async (client) => {
       const period = await assertPostingDateOpen(companyId, date);
-      return financeTransactionRepository.create(
+      const tx = await financeTransactionRepository.create(
         client,
         companyId,
-        { branchId, transactionDate: date, fiscalPeriodId: period?.id, referenceType, referenceId, direction: resolvedDirection, amount, description },
+        {
+          branchId, transactionDate: date, fiscalPeriodId: period?.id, referenceType, referenceId,
+          direction: resolvedDirection, amount, description, fundingSourceId, fundingType, partyName, paymentMode, utrReference,
+        },
         actorId,
       );
+
+      if (fundingSourceId) {
+        await syncFundingSourceAdvancePayable(client, companyId, fundingSourceId, actorId);
+      }
+
+      return tx;
     },
     { isolationLevel: 'REPEATABLE READ' },
   );
@@ -145,10 +159,35 @@ async function recordExpense(
         );
       }
 
+      if (fundingSourceId) {
+        await syncFundingSourceAdvancePayable(client, companyId, fundingSourceId, actorId);
+      }
+
       return expense;
     },
     { isolationLevel: 'REPEATABLE READ' },
   );
+}
+
+/**
+ * Keeps an "Owner Advance Reimbursement"-style payable (one explicitly
+ * linked to this funding source via payables.funding_source_id) in sync
+ * with the live total of every rupee tagged to that funding source —
+ * expense debits AND standalone credit transfers (e.g. cash handed to a
+ * staff member as a business advance) both count, since both are money
+ * that person put into the business. Recomputed from scratch each time
+ * rather than incremented, so it stays correct even if a past entry is
+ * later edited or removed. A funding source with no such payable is a
+ * no-op; this never creates one on its own.
+ */
+async function syncFundingSourceAdvancePayable(client, companyId, fundingSourceId, actorId) {
+  const payable = await payableRepository.findOpenByFundingSourceForUpdate(client, companyId, fundingSourceId);
+  if (!payable) return;
+
+  const total = await financeTransactionRepository.sumByFundingSource(client, companyId, fundingSourceId);
+  if (total === Number(payable.total_amount)) return;
+
+  await payableRepository.syncTotalAmount(client, payable.id, payable.version, total, actorId);
 }
 
 async function listExpenses(companyId, pagination) {

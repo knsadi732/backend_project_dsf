@@ -35,6 +35,23 @@ async function create(client, companyId, fields, createdBy) {
   return rows[0];
 }
 
+/**
+ * Live total of every rupee posted against a funding source — expense
+ * debits AND standalone credit transfers (e.g. an owner handing cash to a
+ * staff member as a business advance) both represent money that person put
+ * into the business, so both count toward what's owed back to them. Used
+ * to keep an "Owner Advance Reimbursement"-style payable's total_amount in
+ * sync with actual advance funding (see finance.service.js).
+ */
+async function sumByFundingSource(client, companyId, fundingSourceId) {
+  const { rows } = await client.query(
+    `SELECT COALESCE(SUM(amount), 0) AS total FROM finance_transactions
+     WHERE company_id = $1 AND funding_source_id = $2 AND is_deleted = FALSE`,
+    [companyId, fundingSourceId],
+  );
+  return Number(rows[0].total);
+}
+
 /** Ledger view: chronological rows with per-row debit/credit split and a running balance. */
 async function list(companyId, pagination, { referenceType } = {}) {
   const conditions = ['ft.company_id = $1', 'ft.is_deleted = FALSE'];
@@ -109,4 +126,4 @@ async function summarize(companyId, { from, to } = {}) {
   return rows;
 }
 
-module.exports = { create, list, summarize };
+module.exports = { create, list, summarize, sumByFundingSource };

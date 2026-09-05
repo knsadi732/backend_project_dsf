@@ -49,6 +49,44 @@ async function findByIdForUpdate(client, companyId, id) {
   return rows[0] || null;
 }
 
+/**
+ * The still-open payable (if any) tracking a given funding source's advances
+ * — e.g. an "Owner Advance Reimbursement" payable for the owner's funding
+ * source. Locked for update since the caller is about to recompute and
+ * write its total_amount.
+ */
+async function findOpenByFundingSourceForUpdate(client, companyId, fundingSourceId) {
+  const { rows } = await client.query(
+    `SELECT * FROM payables
+     WHERE company_id = $1 AND funding_source_id = $2 AND is_deleted = FALSE
+       AND status IN ('pending', 'partial')
+     FOR UPDATE`,
+    [companyId, fundingSourceId],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Recomputes total_amount to the caller-supplied figure (the live sum of
+ * advance-funded expense debits) — used to keep an "Owner Advance
+ * Reimbursement"-style payable in sync with the ledger instead of it being
+ * a one-time manual snapshot. Re-derives status the same way recordPayment
+ * does (paid once amount_paid catches up), and takes the version lock like
+ * every other payable mutation.
+ */
+async function syncTotalAmount(client, id, expectedVersion, totalAmount, updatedBy) {
+  const { rows } = await client.query(
+    `UPDATE payables
+     SET total_amount = $3,
+         status = CASE WHEN amount_paid >= $3 AND $3 > 0 THEN 'paid' WHEN amount_paid > 0 THEN 'partial' ELSE status END,
+         version = version + 1, updated_by = $4, updated_at = now()
+     WHERE id = $1 AND version = $2
+     RETURNING *`,
+    [id, expectedVersion, totalAmount, updatedBy],
+  );
+  return rows[0] || null;
+}
+
 async function list(companyId, pagination, { status } = {}) {
   const extraConditions = [];
   const extraParams = [];
@@ -97,6 +135,8 @@ module.exports = {
   create,
   findById,
   findByIdForUpdate,
+  findOpenByFundingSourceForUpdate,
+  syncTotalAmount,
   list,
   recordPayment,
   updateStatus,

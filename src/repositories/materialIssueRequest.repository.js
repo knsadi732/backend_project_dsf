@@ -39,10 +39,10 @@ async function createItems(client, materialIssueRequestId, items) {
 
 async function findItems(materialIssueRequestId, runner = query) {
   const { rows } = await runner(
-    `SELECT mri.*, pv.sku, pv.size, pv.color, p.name AS raw_material_name, p.uom
+    `SELECT mri.*, iv.sku, iv.size, iv.color, i.item_name AS raw_material_name, i.uom
      FROM material_issue_request_items mri
-     JOIN product_variants pv ON pv.id = mri.raw_material_variant_id
-     JOIN products p ON p.id = pv.product_id
+     JOIN item_variants iv ON iv.id = mri.raw_material_variant_id
+     JOIN items i ON i.id = iv.item_id
      WHERE mri.material_issue_request_id = $1`,
     [materialIssueRequestId],
   );
